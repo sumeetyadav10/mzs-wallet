@@ -28,7 +28,7 @@ const allowedIps = [
 ];
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.ip || '';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || '';
   if (!allowedIps.includes(ip)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
