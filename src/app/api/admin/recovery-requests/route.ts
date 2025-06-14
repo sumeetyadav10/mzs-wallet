@@ -35,12 +35,12 @@ const MAX_REQUESTS = 30; // 30 requests per minute
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.ip || '';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || '';
   console.log('Detected IP:', ip); // Debug log for IP detection
   
   // IP check
   if (!allowedIps.includes(ip)) {
-    return NextResponse.json({ error: 'Access denied: Your IP is not authorized to view this page.' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // Rate limiting
