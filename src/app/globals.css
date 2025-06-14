@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities; 
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.7; box-shadow: 0 0 60px 20px #00FFD0, 0 0 0 0 #00FFD0; }
+  50% { opacity: 1; box-shadow: 0 0 80px 32px #00FFD0, 0 0 0 0 #00FFD0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(230, 194, 0, 0.2); }
+  50% { box-shadow: 0 0 30px rgba(230, 194, 0, 0.4); }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2.5s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Golf Project MZS Wallet Global Styles */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+:root {
+  --golf-green: #1b5e20;
+  --golf-gold: #e6c200;
+  --golf-white: #ffffff;
+  --golf-dark: #1b2a1b;
+  --golf-accent: #8bc34a;
+  --korean-red: #CD2E3A;
+  --korean-blue: #0047A0;
+  --golf-shadow: 0 8px 32px rgba(46, 125, 50, 0.18);
+  --golf-gradient: #ffffff;
+  --golf-card-gradient: #ffffff;
+  --golf-btn-gradient: linear-gradient(90deg, #e6c200 0%, #1b5e20 100%);
+  --golf-btn-shadow: 0 4px 16px rgba(230, 194, 0, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.97);
+  --glass-border: rgba(230, 194, 0, 0.12);
+  --glass-shadow: 0 8px 32px rgba(46, 125, 50, 0.08);
+}
+
+html, body {
+  font-family: 'Noto Sans KR', 'Montserrat', Arial, sans-serif;
+  background: #fff;
+  color: var(--golf-dark);
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--golf-green);
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: var(--golf-green);
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+a:hover {
+  color: var(--golf-gold);
+  transform: translateY(-1px);
+}
+
+button, .btn {
+  background: var(--golf-btn-gradient);
+  color: var(--golf-dark);
+  border-radius: 16px;
+  padding: 0.85em 2.2em;
+  font-weight: 700;
+  border: none;
+  box-shadow: var(--golf-btn-shadow);
+  transition: all 0.3s ease;
+  font-size: 1.1em;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover, .btn:hover {
+  background: linear-gradient(90deg, #1b5e20 0%, #e6c200 100%);
+  color: var(--golf-white);
+  box-shadow: 0 6px 24px rgba(27, 94, 32, 0.18);
+  transform: translateY(-2px) scale(1.02);
+}
+
+button:active, .btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+input, select, textarea {
+  border-radius: 12px;
+  border: 1.5px solid var(--golf-accent);
+  padding: 1em 1.2em;
+  background: var(--glass-bg);
+  color: var(--golf-dark);
+  font-family: inherit;
+  font-size: 1.08em;
+  margin-bottom: 1.2em;
+  box-shadow: 0 2px 8px rgba(230, 194, 0, 0.08);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--golf-gold);
+  box-shadow: 0 4px 12px rgba(230, 194, 0, 0.15);
+  outline: none;
+}
+
+.card {
+  background: var(--golf-card-gradient);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow);
+  padding: 2.5em 2em;
+  margin-bottom: 2em;
+  border: 1.5px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 12px 40px rgba(46, 125, 50, 0.2);
+  transform: translateY(-2px);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: var(--golf-white);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--golf-gold);
+  border-radius: 8px;
+}
+
+/* Korean-inspired decorative elements */
+.golf-pattern {
+  background: none !important;
+}
+
+/* Status chips */
+.status-chip {
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0.2em 0.8em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s ease;
+}
+
+.status-chip.success {
+  background: rgba(46, 125, 50, 0.12);
+  color: var(--golf-green);
+  border: 1px solid rgba(46, 125, 50, 0.2);
+}
+
+.status-chip.error {
+  background: rgba(205, 46, 58, 0.12);
+  color: var(--korean-red);
+  border: 1px solid rgba(205, 46, 58, 0.2);
+}
+
+/* Glassmorphic elements */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Retro golf elements */
+.golf-border {
+  position: relative;
+}
+
+.golf-border::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, var(--golf-gold), var(--golf-green));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0.5;
+} 

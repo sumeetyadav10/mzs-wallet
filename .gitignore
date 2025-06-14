@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Testing
+coverage/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Secrets and keys
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# Cache and temporary files
+.cache/
+.temp/
+.tmp/
+*.tmp
+
+# Build output
+build/
+dist/
+out/
+
+# Local development
+*.local
+local.*
+
+# Next.js specific
+.next/cache/
+.next/static/
+.next/server/
+.next/types/
+.next/swc/
+
+# Large binary files
+*.node
+*.pack
+*.bin
