@@ -16,7 +16,7 @@ const db = getFirestore();
 const allowedIps = ['192.168.31.151'];
 
 export async function GET(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.ip || '';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || '';
   if (!allowedIps.includes(ip)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
