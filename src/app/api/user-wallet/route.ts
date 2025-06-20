@@ -19,12 +19,32 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'Missing email' }, { status: 400 });
     }
-    // Check if user exists in mzs
-    const userQuery = await db.collection('mzs').where('auth_email', '==', email).limit(1).get();
+    
+    // Get ALL documents with this auth_email (remove limit(1))
+    const userQuery = await db.collection('mzs').where('auth_email', '==', email).get();
     if (!userQuery.empty) {
-      const userData = userQuery.docs[0].data();
-      return NextResponse.json({ private_key: userData.private_key });
+      // 1. Prefer doc with migratedAt (old wallet - highest priority)
+      let migratedDoc: any = null;
+      let fallbackDoc: any = null;
+      
+      userQuery.forEach(doc => {
+        const data = doc.data();
+        if (data.migratedAt && data.private_key) {
+          migratedDoc = data;  // OLD WALLET - HIGHEST PRIORITY
+        } else if (data.private_key && !fallbackDoc) {
+          fallbackDoc = data;  // NEW WALLET - FALLBACK
+        }
+      });
+      
+      if (migratedDoc) {
+        return NextResponse.json({ private_key: migratedDoc.private_key });
+      }
+      if (fallbackDoc) {
+        return NextResponse.json({ private_key: fallbackDoc.private_key });
+      }
+      return NextResponse.json({ error: 'No wallet found for this user.' }, { status: 404 });
     }
+    
     // If not found, create user if private_key provided
     if (private_key) {
       const userRef = db.collection('mzs').doc();
