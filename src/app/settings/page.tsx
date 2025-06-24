@@ -72,7 +72,8 @@ export default function Settings() {
       try {
         setIsLoading(true);
         sessionStorage.removeItem('walletPrivateKey');
-        window.location.reload();
+        resetWallet();
+        router.push('/');
       } catch (error) {
         console.error('Error clearing wallet:', error);
       } finally {

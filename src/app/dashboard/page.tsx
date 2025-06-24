@@ -392,7 +392,6 @@ export default function Dashboard() {
   const handleRefresh = async () => {
     setRefreshing(true);
     await new Promise(res => setTimeout(res, 300)); // Simulate loading
-    window.location.reload();
     setRefreshing(false);
   };
 
