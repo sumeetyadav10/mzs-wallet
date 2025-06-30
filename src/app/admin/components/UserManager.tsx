@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FaTimes, FaEdit, FaTrash, FaSave, FaSpinner, FaExclamationTriangle } from 'react-icons/fa';
+import { adminApi, AdminApiError } from '@/lib/adminApi';
 
 
 interface UserData {
@@ -90,10 +91,20 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
         updates[fieldKey] = value;
       }
 
-      // Placeholder - user management is disabled without authentication
-      setError('사용자 관리 기능은 현재 비활성화되어 있습니다.');
+      // Call the admin API to update the user
+      await adminApi.updateUser(user.documentId, updates, `Updated field: ${fieldKey}`);
+      
+      setSuccess(`${field?.label || fieldKey} 필드가 성공적으로 업데이트되었습니다.`);
+      onUserUpdated(); // Refresh the data
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError('필드 업데이트 중 오류가 발생했습니다.');
+      if (err instanceof AdminApiError) {
+        setError(err.message);
+      } else {
+        setError('필드 업데이트 중 오류가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }
@@ -106,10 +117,23 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
     setError(null);
 
     try {
-      // Placeholder - user management is disabled without authentication
-      setError('사용자 관리 기능은 현재 비활성화되어 있습니다.');
+      // Call the admin API to delete specific fields
+      await adminApi.deleteUser(user.documentId, fieldsToDelete, deleteConfirmCode);
+      
+      setSuccess(`${fieldsToDelete.length}개의 필드가 성공적으로 삭제되었습니다.`);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmCode('');
+      setFieldsToDelete([]);
+      onUserUpdated(); // Refresh the data
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError('필드 삭제 중 오류가 발생했습니다.');
+      if (err instanceof AdminApiError) {
+        setError(err.message);
+      } else {
+        setError('필드 삭제 중 오류가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }
@@ -122,10 +146,20 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
     setError(null);
 
     try {
-      // Placeholder - user management is disabled without authentication
-      setError('사용자 관리 기능은 현재 비활성화되어 있습니다.');
+      // Call the admin API to delete the entire user
+      await adminApi.deleteUser(user.documentId, undefined, deleteConfirmCode);
+      
+      setSuccess('사용자가 성공적으로 삭제되었습니다.');
+      setShowDeleteConfirm(false);
+      setDeleteConfirmCode('');
+      onUserUpdated(); // Refresh the data
+      onClose(); // Close the modal after successful deletion
     } catch (err) {
-      setError('사용자 삭제 중 오류가 발생했습니다.');
+      if (err instanceof AdminApiError) {
+        setError(err.message);
+      } else {
+        setError('사용자 삭제 중 오류가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }
