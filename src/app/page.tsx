@@ -165,7 +165,6 @@ export default function Home() {
     <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--golf-gradient)', padding: '2em 0' }}>
       <div className="card" style={{ maxWidth: 420, width: '100%', textAlign: 'center', position: 'relative', boxShadow: '0 8px 32px rgba(46, 125, 50, 0.18)', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(8px)', border: '1.5px solid #e6c20022' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-          <img src="/MZS.png" alt="MZS Logo" style={{ width: 60, height: 60, marginBottom: 4, borderRadius: '50%' }} />
           <h1 style={{ marginBottom: 4, fontWeight: 800, fontSize: '2.2em', color: 'var(--golf-green)' }}>MZS 월렛</h1>
         </div>
         <p style={{ color: 'var(--golf-dark)', marginBottom: 28, fontWeight: 500, fontSize: '1.1em' }}>월렛에 로그인하고 자산을 스타일리시하게 관리하세요.</p>
@@ -210,7 +209,6 @@ export default function Home() {
           onClick={() => setShowGoogleModal(true)}
           disabled={isLoading}
         >
-          <img src="/MZS.png" alt="MZS Logo" style={{ width: 24, height: 24, marginRight: 6, borderRadius: '50%' }} />
           Google로 로그인
         </button>
         <div style={{ marginTop: 18 }}>

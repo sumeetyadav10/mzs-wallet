@@ -419,7 +419,6 @@ export default function Dashboard() {
       <div className="relative z-10">
         <div className="card glass animate-float">
           <div className="flex items-center justify-center gap-4 mb-6">
-            <img src="/MZS.png" alt="MZS Logo" style={{ width: 36, height: 36, marginRight: 8, borderRadius: '50%' }} />
             <h2 className="text-3xl font-bold text-[var(--golf-green)]">MZS 월렛</h2>
           </div>
           <div className="mb-8">

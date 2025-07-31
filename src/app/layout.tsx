@@ -13,7 +13,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin" />
-        <link rel="icon" type="image/png" href="/MZS.png" />
+        <link rel="icon" type="image/png" href="" />
       </head>
       <body>
         <main style={{maxWidth: '600px', margin: '0 auto', background: 'var(--white)', borderRadius: '18px', boxShadow: 'var(--shadow)', padding: '2em 0'}}>
