@@ -13,6 +13,8 @@ import { firebaseConfig } from '@/lib/firebase';
 import BottomNav from '@/components/BottomNav';
 import { FaGolfBall, FaFlagCheckered, FaExchangeAlt, FaSpinner } from 'react-icons/fa';
 import PortfolioValue from '@/components/PortfolioValue';
+import ChainSelector from '@/components/ChainSelector';
+import { sendTronTransaction, isValidTronAddress, formatTrxAmount, getTronExplorerUrl, TRON_TOKENS } from '@/utils/tronUtils';
 
 if (!getApps().length) {
   initializeApp(firebaseConfig);
@@ -51,12 +53,13 @@ const ERC20_ABI = [
 type ModalState = null | { type: 'send' | 'receive', token: TokenBalance | null };
 
 export default function Dashboard() {
-  const { wallet, address, balance, isLoading, error, createWallet, importWallet, setBalance, setWallet, setAddress, setError } = useWallet();
+  const { wallet, address, balance, isLoading, error, createWallet, importWallet, setBalance, setWallet, setAddress, setError, selectedChain, setSelectedChain, tronWallet, tronBalance, getBalance } = useWallet();
   const [privateKey, setPrivateKey] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [maticBalance, setMaticBalance] = useState<string | null>(null);
   const [mzsBalance, setMzsBalance] = useState<string | null>(null);
   const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const [tronTokens, setTronTokens] = useState<TokenBalance[]>([]);
   const [modal, setModal] = useState<ModalState>(null);
   const [recipientAddress, setRecipientAddress] = useState('');
   const [amount, setAmount] = useState('');
@@ -105,7 +108,7 @@ export default function Dashboard() {
         setAddress(w.address);
         setLoading(false);
       } catch (err) {
-        setError('Failed to load wallet.');
+        setError('지갑 불러오기 실패.');
         setLoading(false);
       }
     };
@@ -117,66 +120,86 @@ export default function Dashboard() {
     const fetchTokenBalances = async () => {
       if (!wallet || !address) return;
       try {
-        const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
-        // MATIC
-        setMaticBalance(balance);
-        // MZS
-        const mzsContract = new ethers.Contract(MZS_ADDRESS, MZS_ABI, provider);
-        const [mzsRaw, decimals, symbol] = await Promise.all([
-          mzsContract.balanceOf(address),
-          mzsContract.decimals(),
-          mzsContract.symbol()
-        ]);
-        setMzsBalance(ethers.formatUnits(mzsRaw, decimals));
-        // Custom tokens
-        const savedTokens = localStorage.getItem(`customTokens_${address}`);
-        const customTokens: string[] = savedTokens ? JSON.parse(savedTokens) : [];
-        const customTokenBalances: TokenBalance[] = [];
-        const batchSize = 5;
-        for (let i = 0; i < customTokens.length; i += batchSize) {
-          const batch = customTokens.slice(i, i + batchSize);
-          await Promise.all(batch.map(async (tokenAddress) => {
-            try {
-              const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-              const [balance, decimals, symbol] = await Promise.all([
-                contract.balanceOf(address),
-                contract.decimals(),
-                contract.symbol()
-              ]);
-              customTokenBalances.push({
-                symbol,
-                balance: ethers.formatUnits(balance, decimals),
-                address: tokenAddress,
-                icon: tokenIcons[symbol] || ''
-              });
-            } catch (error) {
-              console.error(`Error fetching balance for token ${tokenAddress}:`, error);
+        if (selectedChain === 'polygon') {
+          const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
+          // MATIC
+          setMaticBalance(balance);
+          // MZS
+          const mzsContract = new ethers.Contract(MZS_ADDRESS, MZS_ABI, provider);
+          const [mzsRaw, decimals, symbol] = await Promise.all([
+            mzsContract.balanceOf(address),
+            mzsContract.decimals(),
+            mzsContract.symbol()
+          ]);
+          setMzsBalance(ethers.formatUnits(mzsRaw, decimals));
+          // Custom tokens
+          const savedTokens = localStorage.getItem(`customTokens_${address}`);
+          const customTokens: string[] = savedTokens ? JSON.parse(savedTokens) : [];
+          const customTokenBalances: TokenBalance[] = [];
+          const batchSize = 5;
+          for (let i = 0; i < customTokens.length; i += batchSize) {
+            const batch = customTokens.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (tokenAddress) => {
+              try {
+                const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+                const [balance, decimals, symbol] = await Promise.all([
+                  contract.balanceOf(address),
+                  contract.decimals(),
+                  contract.symbol()
+                ]);
+                customTokenBalances.push({
+                  symbol,
+                  balance: ethers.formatUnits(balance, decimals),
+                  address: tokenAddress,
+                  icon: tokenIcons[symbol] || ''
+                });
+              } catch (error) {
+                console.error(`Error fetching balance for token ${tokenAddress}:`, error);
+              }
+            }));
+            if (i + batchSize < customTokens.length) {
+              await new Promise(res => setTimeout(res, 1000)); // Wait 1 second between batches
             }
-          }));
-          if (i + batchSize < customTokens.length) {
-            await new Promise(res => setTimeout(res, 1000)); // Wait 1 second between batches
           }
+
+          // Combine all token balances
+          const allTokens: TokenBalance[] = [
+            {
+              symbol: 'MATIC',
+              balance: balance,
+              address: 'MATIC',
+              icon: tokenIcons['MATIC']
+            },
+            {
+              symbol: 'MZS',
+              balance: ethers.formatUnits(mzsRaw, decimals),
+              address: MZS_ADDRESS,
+              icon: tokenIcons['MZS']
+            },
+            ...customTokenBalances
+          ];
+
+          setTokenBalances(allTokens);
+          setTokenError(null);
+        } else if (selectedChain === 'tron' && tronBalance) {
+          // Update token balances for Tron
+          const allTronTokens: TokenBalance[] = [
+            {
+              symbol: 'TRX',
+              balance: tronBalance.trxBalance.toString(),
+              address: 'native',
+              icon: '/tron-logo.svg'
+            },
+            ...tronBalance.tokens.map(token => ({
+              symbol: token.symbol,
+              balance: token.balance.toString(),
+              address: token.address,
+              icon: token.logo || '/tron-logo.svg'
+            }))
+          ];
+          setTronTokens(allTronTokens);
+          setLoading(false);
         }
-
-        // Combine all token balances
-        const allTokens: TokenBalance[] = [
-          {
-            symbol: 'MATIC',
-            balance: balance,
-            address: 'MATIC',
-            icon: tokenIcons['MATIC']
-          },
-          {
-            symbol: 'MZS',
-            balance: ethers.formatUnits(mzsRaw, decimals),
-            address: MZS_ADDRESS,
-            icon: tokenIcons['MZS']
-          },
-          ...customTokenBalances
-        ];
-
-        setTokenBalances(allTokens);
-        setTokenError(null);
       } catch (error) {
         setTokenError('토큰 잔액을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
         setTokenBalances([]);
@@ -207,7 +230,7 @@ export default function Dashboard() {
         window.removeEventListener('storage', handleStorageChange);
       };
     }
-  }, [wallet, address, balance]);
+  }, [wallet, address, balance, selectedChain, tronBalance]);
 
   useEffect(() => {
     // Check Polygon network connection
@@ -216,12 +239,12 @@ export default function Dashboard() {
         const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
         const network = await provider.getNetwork();
         if (network.chainId !== BigInt(137)) {
-          setNetworkWarning('Not connected to Polygon Mainnet. Please check your RPC URL.');
+          setNetworkWarning('Polygon 메인넷에 연결되지 않았습니다. RPC URL을 확인해주세요.');
         } else {
           setNetworkWarning(null);
         }
       } catch (error) {
-        setNetworkWarning('Unable to connect to Polygon network. Please check your RPC URL.');
+        setNetworkWarning('Polygon 네트워크에 연결할 수 없습니다. RPC URL을 확인해주세요.');
       }
     };
     checkPolygonNetwork();
@@ -246,9 +269,15 @@ export default function Dashboard() {
       const signer = wallet.connect(provider);
       console.log("[DEBUG] Connected signer:", signer.address);
       
-      // Validate address
-      if (!ethers.isAddress(recipientAddress)) {
-        throw new Error('잘못된 받는 사람 주소입니다');
+      // Validate address based on chain
+      if (selectedChain === 'polygon') {
+        if (!ethers.isAddress(recipientAddress)) {
+          throw new Error('잘못된 받는 사람 주소입니다');
+        }
+      } else if (selectedChain === 'tron') {
+        if (!isValidTronAddress(recipientAddress)) {
+          throw new Error('잘못된 Tron 주소입니다');
+        }
       }
       console.log("[DEBUG] Recipient address validated");
       
@@ -263,7 +292,7 @@ export default function Dashboard() {
       console.log("[DEBUG] Gas price:", feeData.gasPrice?.toString());
       
       if (!feeData.gasPrice) {
-        throw new Error('Failed to get gas price');
+        throw new Error('가스 가격 불러오기 실패');
       }
       
       // Guard: selectedToken is not null
@@ -272,7 +301,36 @@ export default function Dashboard() {
       let txHash = '';
       let tx;
       
-      if (selectedToken.symbol === 'MATIC') {
+      if (selectedChain === 'tron') {
+        // Handle Tron transaction
+        const result = await sendTronTransaction(
+          wallet.privateKey,
+          recipientAddress,
+          Number(amount),
+          selectedToken.symbol
+        );
+        txHash = result.txid;
+        
+        // Update the success details for Tron
+        setSuccessDetails({
+          hash: txHash,
+          amount: amount,
+          token: selectedToken.symbol,
+          recipient: recipientAddress
+        });
+        setTransactionStatus('success');
+        setShowSuccessMessage(true);
+        setShowLoadingModal(false);
+        
+        // Close modal and refresh balances
+        setShowSendModal(false);
+        setAmount('');
+        setRecipientAddress('');
+        setTimeout(() => {
+          getBalance();
+        }, 3000);
+        return;
+      } else if (selectedToken.symbol === 'MATIC') {
         console.log("[DEBUG] Processing MATIC transfer");
         // Check if user has enough balance including gas
         const balance = await provider.getBalance(address);
@@ -299,7 +357,7 @@ export default function Dashboard() {
         console.log("[DEBUG] Processing token transfer for:", selectedToken.symbol);
         // Guard: do not try to send as contract if address is 'MATIC'
         if (selectedToken.address === 'MATIC') {
-          throw new Error('MATIC transfers must be done as native token, not as a contract.');
+          throw new Error('MATIC 전송은 컨트랙트가 아닌 네이티브 토큰으로 수행되어야 합니다.');
         }
         
         // Use correct ABI for MZS vs other tokens
@@ -319,12 +377,12 @@ export default function Dashboard() {
         console.log("[DEBUG] Token balance:", balance.toString());
         
         if (balance < parsedAmount) {
-          throw new Error('Insufficient token balance');
+          throw new Error('토큰 잔액이 부족합니다');
         }
         
         if (typeof tokenContract.transfer !== 'function') {
           console.error("[DEBUG] Contract functions:", Object.keys(tokenContract));
-          throw new Error('transfer function is not available on the contract instance');
+          throw new Error('컨트랙트에서 transfer 기능을 사용할 수 없습니다');
         }
         
         tx = await tokenContract.transfer(recipientAddress, parsedAmount, {
@@ -353,7 +411,7 @@ export default function Dashboard() {
       }
       setShowLoadingModal(false);
       if (!receipt || receipt.status === 0) {
-        throw new Error('Transaction failed');
+        throw new Error('거래 실패');
       }
       setTransactionStatus('success');
       setSuccessDetails({
@@ -421,6 +479,9 @@ export default function Dashboard() {
           <div className="flex items-center justify-center gap-4 mb-6">
             <h2 className="text-3xl font-bold text-[var(--golf-green)]">MZS 월렛</h2>
           </div>
+          <div className="flex justify-center mb-4">
+            <ChainSelector selectedChain={selectedChain} onChainChange={setSelectedChain} />
+          </div>
           <div className="mb-8">
             <div className="text-center mb-2">
               <span className="text-[var(--golf-dark)] text-sm">총 보유 자산</span>
@@ -430,11 +491,15 @@ export default function Dashboard() {
                 <div className="animate-pulse-slow">Loading...</div>
               ) : error ? (
                 <div className="text-[var(--korean-red)]">{error}</div>
-              ) : mzsBalance ? (
+              ) : selectedChain === 'polygon' && mzsBalance ? (
                 <PortfolioValue mzsBalance={parseFloat(mzsBalance)} compact={true} />
+              ) : selectedChain === 'tron' && tronBalance ? (
+                <span className="text-4xl font-bold text-[var(--golf-green)]">
+                  {formatTrxAmount(tronBalance.trxBalance)}
+                </span>
               ) : (
                 <span className="text-4xl font-bold text-[var(--golf-green)]">
-                  ${Number(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })} MATIC
+                  {selectedChain === 'polygon' ? `${Number(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })} MATIC` : '0 TRX'}
                 </span>
               )}
             </div>
@@ -465,10 +530,12 @@ export default function Dashboard() {
           {/* Token List */}
           <div className="w-full max-w-[420px] mx-auto">
             <div className="glass p-3 rounded-2xl shadow mb-2">
-              <h3 className="text-lg font-bold text-[var(--golf-green)] mb-2 text-left">내 토큰</h3>
-              {tokenBalances && tokenBalances.length > 0 ? (
+              <h3 className="text-lg font-bold text-[var(--golf-green)] mb-2 text-left">
+                {selectedChain === 'polygon' ? 'Polygon' : 'Tron'} 토큰
+              </h3>
+              {(selectedChain === 'polygon' ? tokenBalances : tronTokens).length > 0 ? (
                 <ul className="flex flex-col gap-2">
-                  {tokenBalances.map((token, idx) => (
+                  {(selectedChain === 'polygon' ? tokenBalances : tronTokens).map((token, idx) => (
                     <li key={token.symbol + idx} className="flex items-center justify-between bg-[var(--golf-accent)]/20 rounded-xl px-3 py-2 font-semibold text-[var(--golf-dark)]">
                       <span className="flex items-center gap-2">
                         {token.icon && <img src={token.icon} alt={token.symbol} className="w-5 h-5 rounded-full" />}
@@ -496,13 +563,14 @@ export default function Dashboard() {
                     className="w-full glass mb-2"
                     value={selectedToken ? selectedToken.symbol : ''}
                     onChange={e => {
-                      const token = tokenBalances.find(t => t.symbol === e.target.value);
+                      const currentTokens = selectedChain === 'polygon' ? tokenBalances : tronTokens;
+                      const token = currentTokens.find(t => t.symbol === e.target.value);
                       setSelectedToken(token || null);
                     }}
                     required
                   >
                     <option value="" disabled>토큰을 선택하세요</option>
-                    {tokenBalances.map(token => (
+                    {(selectedChain === 'polygon' ? tokenBalances : tronTokens).map(token => (
                       <option key={token.symbol} value={token.symbol}>{token.symbol}</option>
                     ))}
                   </select>
@@ -594,8 +662,8 @@ export default function Dashboard() {
           >
             <div className="glass rounded-2xl p-8 max-w-xs w-full flex flex-col items-center border border-[var(--golf-gold)] animate-glow">
               <FaSpinner className="animate-spin text-4xl text-[var(--golf-green)] mb-4" />
-              <div className="text-lg font-bold text-[var(--golf-green)] mb-2">Transaction in Progress</div>
-              <div className="text-sm text-center text-[var(--golf-dark)]">Please wait while your transaction is being confirmed on the blockchain. This may take up to 3 minutes.</div>
+              <div className="text-lg font-bold text-[var(--golf-green)] mb-2">거래 진행 중</div>
+              <div className="text-sm text-center text-[var(--golf-dark)]">거래가 블록체인에서 확인되고 있습니다. 최대 3분 소요될 수 있습니다.</div>
             </div>
           </motion.div>
         )}
@@ -613,24 +681,24 @@ export default function Dashboard() {
             <div className="bg-yellow-500 text-white px-6 py-4 rounded-lg shadow-lg max-w-md mx-auto">
               <div className="flex items-center gap-3 mb-2">
                 <FaFlagCheckered className="text-white" />
-                <h3 className="font-bold text-lg">Transaction Pending</h3>
+                <h3 className="font-bold text-lg">거래 대기 중</h3>
               </div>
               <div className="text-sm space-y-1">
-                <p>Amount: {pendingDetails.amount} {pendingDetails.token}</p>
-                <p>To: {pendingDetails.recipient.slice(0, 6)}...{pendingDetails.recipient.slice(-4)}</p>
+                <p>금액: {pendingDetails.amount} {pendingDetails.token}</p>
+                <p>받는 사람: {pendingDetails.recipient.slice(0, 6)}...{pendingDetails.recipient.slice(-4)}</p>
                 <p className="text-xs opacity-80">
-                  Transaction Hash: {pendingDetails.hash.slice(0, 10)}...{pendingDetails.hash.slice(-8)}
+                  트랜잭션 해시: {pendingDetails.hash.slice(0, 10)}...{pendingDetails.hash.slice(-8)}
                 </p>
               </div>
               <a
-                href={`https://polygonscan.com/tx/${pendingDetails.hash}`}
+                href={selectedChain === 'polygon' ? `https://polygonscan.com/tx/${pendingDetails.hash}` : getTronExplorerUrl(pendingDetails.hash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white underline mt-2 inline-block"
               >
-                View on Polygonscan
+                Polygonscan에서 보기
               </a>
-              <div className="text-xs mt-2">Confirmation is taking longer than expected. You can check the status on Polygonscan.</div>
+              <div className="text-xs mt-2">확인이 예상보다 오래 걸리고 있습니다. Polygonscan에서 상태를 확인할 수 있습니다.</div>
             </div>
           </motion.div>
         )}
@@ -648,22 +716,22 @@ export default function Dashboard() {
             <div className="bg-[var(--golf-green)] text-white px-6 py-4 rounded-lg shadow-lg max-w-md mx-auto">
               <div className="flex items-center gap-3 mb-2">
                 <FaFlagCheckered className="text-[var(--golf-gold)]" />
-                <h3 className="font-bold text-lg">Transaction Successful!</h3>
+                <h3 className="font-bold text-lg">거래 성공!</h3>
               </div>
               <div className="text-sm space-y-1">
-                <p>Amount: {successDetails.amount} {successDetails.token}</p>
-                <p>To: {successDetails.recipient.slice(0, 6)}...{successDetails.recipient.slice(-4)}</p>
+                <p>금액: {successDetails.amount} {successDetails.token}</p>
+                <p>받는 사람: {successDetails.recipient.slice(0, 6)}...{successDetails.recipient.slice(-4)}</p>
                 <p className="text-xs opacity-80">
-                  Transaction Hash: {successDetails.hash.slice(0, 10)}...{successDetails.hash.slice(-8)}
+                  트랜잭션 해시: {successDetails.hash.slice(0, 10)}...{successDetails.hash.slice(-8)}
                 </p>
               </div>
               <a
-                href={`https://polygonscan.com/tx/${successDetails.hash}`}
+                href={selectedChain === 'polygon' ? `https://polygonscan.com/tx/${successDetails.hash}` : getTronExplorerUrl(successDetails.hash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[var(--golf-gold)] text-sm hover:underline mt-2 inline-block"
               >
-                View on Polygonscan
+                Polygonscan에서 보기
               </a>
             </div>
           </motion.div>

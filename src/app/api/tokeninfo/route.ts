@@ -6,8 +6,8 @@ export async function POST(req: NextRequest) {
     if (!contractAddress) {
       return NextResponse.json({ error: '토큰 주소가 필요합니다.' }, { status: 400 });
     }
-    const apiKey = process.env.POLYGONSCAN_API_KEY || 'JZB52EQ9Z4Z4AYMVSRM5PP3ERUJ2891I4R';
-    const apiUrl = `https://api.polygonscan.com/api?module=token&action=tokeninfo&contractaddress=${contractAddress}&apikey=${apiKey}`;
+    const apiKey = process.env.NEXT_PUBLIC_POLYGONSCAN_API_KEY || 'MG6RJ6UYNEV5MWH9BABFHCYIJNGUNX248E';
+    const apiUrl = `https://api.etherscan.io/v2/api?chainid=137&module=token&action=tokeninfo&contractaddress=${contractAddress}&apikey=${apiKey}`;
     const res = await fetch(apiUrl);
     if (!res.ok) {
       return NextResponse.json({ error: 'Polygonscan 요청에 실패했습니다.' }, { status: 502 });

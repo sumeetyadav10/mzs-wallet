@@ -28,7 +28,7 @@ export default function ForgotPassword() {
         body: JSON.stringify({ address }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "User not found");
+      if (!res.ok) throw new Error(data.error || "사용자를 찾을 수 없습니다");
       setUserId(data.user_id);
       // Submit password reset request
       const reqRes = await fetch("/api/auth/request-password-reset", {
@@ -42,7 +42,7 @@ export default function ForgotPassword() {
         }),
       });
       const reqData = await reqRes.json();
-      if (!reqRes.ok) throw new Error(reqData.error || "Failed to submit request");
+      if (!reqRes.ok) throw new Error(reqData.error || "요청 제출에 실패했습니다");
       setStep("showUid");
     } catch (err: any) {
       setError(err.message);
@@ -56,7 +56,7 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError(null);
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("비밀번호가 일치하지 않습니다");
       return;
     }
     setIsLoading(true);
@@ -67,7 +67,7 @@ export default function ForgotPassword() {
         body: JSON.stringify({ user_id: userId, new_password: newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to reset password");
+      if (!res.ok) throw new Error(data.error || "비밀번호 재설정에 실패했습니다");
       setStep("done");
       // Import wallet after password reset
       const pkRes = await fetch("/api/auth/get-private-key", {
@@ -76,7 +76,7 @@ export default function ForgotPassword() {
         body: JSON.stringify({ user_id: userId }),
       });
       const pkData = await pkRes.json();
-      if (!pkRes.ok) throw new Error(pkData.error || "Failed to import wallet");
+      if (!pkRes.ok) throw new Error(pkData.error || "지갑 가져오기에 실패했습니다");
       sessionStorage.setItem("walletPrivateKey", pkData.private_key);
       sessionStorage.setItem("userId", userId);
       // Optionally, you can trigger a reload or redirect
@@ -92,14 +92,14 @@ export default function ForgotPassword() {
     <div style={{ minHeight: '80vh', background: 'var(--golf-gradient)', borderRadius: '18px', boxShadow: 'var(--golf-shadow)', padding: '2em 0' }}>
       <div className="card" style={{ maxWidth: 420, margin: '0 auto', textAlign: 'center', position: 'relative', background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(8px)', border: '1.5px solid #e6c20022', boxShadow: '0 8px 32px rgba(46, 125, 50, 0.18)' }}>
         <FaGolfBall size={48} color="var(--golf-gold)" style={{ marginBottom: 16 }} />
-        <h1 style={{ color: 'var(--golf-green)', fontWeight: 700, fontSize: '2rem', marginBottom: 8 }}>Forgot Password</h1>
+        <h1 style={{ color: 'var(--golf-green)', fontWeight: 700, fontSize: '2rem', marginBottom: 8 }}>비밀번호 찾기</h1>
         {step === "address" && (
           <form onSubmit={handleRequestReset} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <input
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
-              placeholder="Wallet Address"
+              placeholder="지갑 주소"
               required
               style={{ marginBottom: 12 }}
               disabled={isLoading}
@@ -108,7 +108,7 @@ export default function ForgotPassword() {
               type="password"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
-              placeholder="New Password"
+              placeholder="새 비밀번호"
               required
               style={{ marginBottom: 12 }}
               disabled={isLoading}
@@ -116,23 +116,23 @@ export default function ForgotPassword() {
             <textarea
               value={identityProof}
               onChange={e => setIdentityProof(e.target.value)}
-              placeholder="Identity Proof (e.g. old password, email, etc.)"
+              placeholder="신원 증명 (예: 이전 비밀번호, 이메일 등)"
               required
               style={{ marginBottom: 12 }}
               disabled={isLoading}
             />
             <button type="submit" className="btn" style={{ fontSize: '1.1em', marginBottom: 8 }} disabled={isLoading}>
-              {isLoading ? 'Sending...' : 'Send Request'}
+              {isLoading ? '전송 중...' : '요청 보내기'}
             </button>
             {error && <div style={{ color: 'red', marginBottom: 8, fontWeight: 600 }}>{error}</div>}
           </form>
         )}
         {step === "showUid" && (
           <div style={{ color: 'var(--primary)', fontWeight: 600, margin: '24px 0' }}>
-            <div>Request sent for review.</div>
-            <div>User ID (UID): <span style={{ color: 'var(--accent)' }}>{userId}</span></div>
-            <div style={{ color: 'var(--text)', fontSize: 14, marginTop: 8 }}>Wait for admin approval. You can log in once approved.</div>
-            <button className="btn" style={{ marginTop: 16, background: 'var(--accent)', color: 'var(--text)' }} onClick={() => router.push("/")}>Back to Login</button>
+            <div>검토를 위해 요청이 전송되었습니다.</div>
+            <div>사용자 ID (UID): <span style={{ color: 'var(--accent)' }}>{userId}</span></div>
+            <div style={{ color: 'var(--text)', fontSize: 14, marginTop: 8 }}>관리자 승인을 기다려주세요. 승인되면 로그인할 수 있습니다.</div>
+            <button className="btn" style={{ marginTop: 16, background: 'var(--accent)', color: 'var(--text)' }} onClick={() => router.push("/")}>로그인으로 돌아가기</button>
           </div>
         )}
         {step === "reset" && (
@@ -141,7 +141,7 @@ export default function ForgotPassword() {
               type="password"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
-              placeholder="New Password"
+              placeholder="새 비밀번호"
               required
               style={{ marginBottom: 12 }}
               disabled={isLoading}
@@ -150,19 +150,19 @@ export default function ForgotPassword() {
               type="password"
               value={confirmPassword}
               onChange={e => setConfirmPassword(e.target.value)}
-              placeholder="Confirm Password"
+              placeholder="비밀번호 확인"
               required
               style={{ marginBottom: 12 }}
               disabled={isLoading}
             />
             <button type="submit" className="btn" style={{ fontSize: '1.1em', marginBottom: 8 }} disabled={isLoading}>
-              {isLoading ? 'Resetting...' : 'Reset Password'}
+              {isLoading ? '재설정 중...' : '비밀번호 재설정'}
             </button>
             {error && <div style={{ color: 'red', marginBottom: 8, fontWeight: 600 }}>{error}</div>}
           </form>
         )}
         {step === "done" && (
-          <div style={{ color: 'var(--golf-green)', fontWeight: 700, fontSize: 18, margin: '24px 0' }}>Password reset successful! Importing wallet and logging in...</div>
+          <div style={{ color: 'var(--golf-green)', fontWeight: 700, fontSize: 18, margin: '24px 0' }}>비밀번호 재설정 성공! 지갑을 가져와 로그인 중입니다...</div>
         )}
       </div>
     </div>

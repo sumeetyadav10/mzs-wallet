@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { getUserWallet, updateUserWallet } from '@/lib/database';
+import { getTronWallet, getTronBalance, type TronWallet, type TronBalance } from '@/utils/tronUtils';
+import type { Chain } from '@/components/ChainSelector';
 
 type WalletType = ethers.Wallet | ethers.HDNodeWallet;
 
@@ -18,6 +20,11 @@ interface WalletContextType {
   setWallet: React.Dispatch<React.SetStateAction<WalletType | null>>;
   setAddress: React.Dispatch<React.SetStateAction<string | null>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
+  // Multi-chain support
+  selectedChain: Chain;
+  setSelectedChain: (chain: Chain) => void;
+  tronWallet: TronWallet | null;
+  tronBalance: TronBalance | null;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -28,6 +35,9 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [balance, setBalance] = useState<string>('0');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChain, setSelectedChain] = useState<Chain>('polygon');
+  const [tronWallet, setTronWallet] = useState<TronWallet | null>(null);
+  const [tronBalance, setTronBalance] = useState<TronBalance | null>(null);
 
   const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
 
@@ -70,8 +80,14 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const getBalance = async () => {
     if (!address) return;
     try {
-      const balance = await provider.getBalance(address);
-      setBalance(ethers.formatEther(balance));
+      if (selectedChain === 'polygon') {
+        const balance = await provider.getBalance(address);
+        setBalance(ethers.formatEther(balance));
+      } else if (selectedChain === 'tron' && tronWallet) {
+        const tronBalanceData = await getTronBalance(tronWallet.address);
+        setTronBalance(tronBalanceData);
+        setBalance(tronBalanceData.trxBalance.toString());
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get balance');
     }
@@ -83,6 +99,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAddress(null);
     setBalance('0');
     setError(null);
+    setTronWallet(null);
+    setTronBalance(null);
   };
 
   // Listen for sessionStorage changes (cross-tab and in-app)
@@ -144,11 +162,50 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     loadWallet();
   }, []);
 
+  // Load Tron wallet when wallet is available
+  useEffect(() => {
+    const loadTronWallet = async () => {
+      // Get user email from localStorage (stored by Web3Auth)
+      const userInfoStr = localStorage.getItem('userInfo');
+      
+      if (userInfoStr && wallet) {
+        try {
+          const userInfo = JSON.parse(userInfoStr);
+          const email = userInfo.email;
+          
+          if (email) {
+            console.log('[WalletContext] Loading Tron wallet for email:', email);
+            const tronWalletData = await getTronWallet(email);
+            console.log('[WalletContext] Tron wallet loaded:', tronWalletData);
+            setTronWallet(tronWalletData);
+            if (selectedChain === 'tron') {
+              setAddress(tronWalletData.address);
+            }
+          } else {
+            console.log('[WalletContext] No email found in userInfo');
+          }
+        } catch (err) {
+          console.error('Failed to load Tron wallet:', err);
+        }
+      }
+    };
+    loadTronWallet();
+  }, [wallet]);
+
+  // Update address when chain changes
+  useEffect(() => {
+    if (selectedChain === 'polygon' && wallet) {
+      setAddress(wallet.address);
+    } else if (selectedChain === 'tron' && tronWallet) {
+      setAddress(tronWallet.address);
+    }
+  }, [selectedChain, wallet, tronWallet]);
+
   useEffect(() => {
     if (address) {
       getBalance();
     }
-  }, [address]);
+  }, [address, selectedChain]);
 
   return (
     <WalletContext.Provider
@@ -166,6 +223,10 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setWallet,
         setAddress,
         setError,
+        selectedChain,
+        setSelectedChain,
+        tronWallet,
+        tronBalance,
       }}
     >
       {children}

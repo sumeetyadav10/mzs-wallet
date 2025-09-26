@@ -18,7 +18,7 @@ interface Transaction {
 }
 
 export default function Transactions() {
-  const { address, wallet } = useWallet();
+  const { address, wallet, selectedChain } = useWallet();
   const router = useRouter();
   const pathname = usePathname();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -33,11 +33,39 @@ export default function Transactions() {
     const fetchTransactions = async () => {
       setIsLoading(true);
       setError(null);
+      
+      // Only fetch transactions for Polygon chain
+      if (selectedChain !== 'polygon') {
+        console.log('Transactions only available for Polygon chain. Current chain:', selectedChain);
+        setTransactions([]);
+        setIsLoading(false);
+        return;
+      }
+      
       try {
+        // Use proxy API to avoid CORS issues in production
         const [nativeTxs, tokenTxs] = await Promise.all([
-          fetch(`https://api.polygonscan.com/api?module=account&action=txlist&address=${address}&sort=desc&apikey=JZB52EQ9Z4Z4AYMVSRM5PP3ERUJ2891I4R`).then(res => res.json()),
-          fetch(`https://api.polygonscan.com/api?module=account&action=tokentx&address=${address}&sort=desc&apikey=JZB52EQ9Z4Z4AYMVSRM5PP3ERUJ2891I4R`).then(res => res.json())
+          fetch(`/api/transactions?address=${address}&action=txlist`).then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+          }),
+          fetch(`/api/transactions?address=${address}&action=tokentx`).then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+          })
         ]);
+        console.log('Native transactions response:', nativeTxs);
+        console.log('Token transactions response:', tokenTxs);
+        console.log('Current address:', address);
+        console.log('Selected chain:', selectedChain);
+        
+        // Check if API returned an error
+        if (nativeTxs.status !== "1") {
+          console.error('Native TX API Error:', nativeTxs.message || nativeTxs.result);
+        }
+        if (tokenTxs.status !== "1") {
+          console.error('Token TX API Error:', tokenTxs.message || tokenTxs.result);
+        }
         const nativeTransactions = nativeTxs.status === "1" && nativeTxs.result ? nativeTxs.result.map((tx: any) => ({
           hash: tx.hash,
           from: tx.from,
@@ -59,13 +87,14 @@ export default function Transactions() {
         const allTxs = [...nativeTransactions, ...tokenTransactions].sort((a, b) => b.timestamp - a.timestamp);
         setTransactions(allTxs);
       } catch (err) {
-        setError("Failed to fetch transactions");
+        console.error('Error fetching transactions:', err);
+        setError("\uac70\ub798 \ub0b4\uc5ed\uc744 \ubd88\ub7ec\uc624\ub294\ub370 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4");
       } finally {
         setIsLoading(false);
       }
     };
     fetchTransactions();
-  }, [wallet, address, router]);
+  }, [wallet, address, router, selectedChain]);
 
   return (
     <div style={{ minHeight: '80vh', background: 'var(--golf-gradient)', borderRadius: '18px', boxShadow: 'var(--golf-shadow)', padding: '2em 0' }}>
@@ -80,11 +109,13 @@ export default function Transactions() {
             <div style={{ padding: '2em 0' }}><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--golf-accent)]"></div></div>
           ) : error ? (
             <div style={{ color: 'var(--golf-gold)', fontWeight: 600 }}>{error}</div>
+          ) : selectedChain === 'tron' ? (
+            <div style={{ color: 'var(--golf-gold)', fontWeight: 500 }}>트론 체인의 거래 내역은 아직 지원되지 않습니다.</div>
           ) : transactions.length === 0 ? (
             <div style={{ color: 'var(--golf-gold)', fontWeight: 500 }}>아직 거래가 없습니다.</div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {transactions.map((tx, idx) => (
+              {transactions.map((tx) => (
                 <li key={tx.hash} style={{ background: 'rgba(255,255,255,0.92)', color: 'var(--golf-dark)', borderRadius: 14, marginBottom: 10, padding: '1em', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 600, boxShadow: '0 2px 8px #e6c20011' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {tx.tokenSymbol === 'MATIC' ? <FaGolfBall size={20} color="var(--golf-gold)" /> : <FaFlagCheckered size={20} color="var(--golf-green)" />} {tx.tokenSymbol}

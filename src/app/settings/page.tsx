@@ -38,22 +38,22 @@ export default function Settings() {
       setShowExport(true);
       setExportError(null);
     } else {
-      setExportError('Wallet not loaded.');
+      setExportError('지갑이 로드되지 않았습니다.');
     }
   };
 
   const handleBackupWallet = () => {
     if (wallet && 'privateKey' in wallet) {
       const blob = new Blob([
-        `Wallet Backup\n\n` +
-        `Date: ${new Date().toLocaleString()}\n` +
-        `Network: Polygon Mainnet\n` +
-        `Address: ${wallet.address}\n` +
-        `Private Key: ${wallet.privateKey}\n\n` +
-        `IMPORTANT: Keep this file safe and secure!\n` +
-        `Anyone with access to your private key can access your funds.\n` +
-        `Never share your private key with anyone.\n` +
-        `Store this backup in a secure location.`
+        `지갑 백업\n\n` +
+        `날짜: ${new Date().toLocaleString()}\n` +
+        `네트워크: Polygon 메인넷\n` +
+        `주소: ${wallet.address}\n` +
+        `개인키: ${wallet.privateKey}\n\n` +
+        `중요: 이 파일을 안전하게 보관하세요!\n` +
+        `개인키를 아는 사람은 누구나 귀하의 자산에 접근할 수 있습니다.\n` +
+        `개인키를 누구와도 공유하지 마세요.\n` +
+        `이 백업을 안전한 장소에 보관하세요.`
       ], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       if (downloadRef.current) {
@@ -63,12 +63,12 @@ export default function Settings() {
         setExportError(null);
       }
     } else {
-      setExportError('Wallet not loaded.');
+      setExportError('지갑이 로드되지 않았습니다.');
     }
   };
 
   const handleClearWallet = async () => {
-    if (confirm('Are you sure you want to clear your wallet? This will remove it from this device but not from the blockchain.')) {
+    if (confirm('지갑을 삭제하시겠습니까? 이 기기에서만 제거되며 블록체인에서는 제거되지 않습니다.')) {
       try {
         setIsLoading(true);
         sessionStorage.removeItem('walletPrivateKey');
@@ -113,7 +113,7 @@ export default function Settings() {
                 <div style={{ background: 'var(--golf-accent)', borderRadius: 8, padding: '1em', marginBottom: 12, fontFamily: 'monospace', fontSize: 14 }}>{showPrivateKey ? wallet.privateKey : '••••••••••••••••••••••••••••••••'}</div>
               )}
               <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={() => setShowPrivateKey(!showPrivateKey)} className="btn" style={{ background: 'var(--golf-green)', color: 'var(--golf-white)' }}>{showPrivateKey ? '숨기기' : '보기'} Private Key</button>
+                <button onClick={() => setShowPrivateKey(!showPrivateKey)} className="btn" style={{ background: 'var(--golf-green)', color: 'var(--golf-white)' }}>{showPrivateKey ? '개인키 숨기기' : '개인키 보기'}</button>
                 <button onClick={() => setShowExport(false)} className="btn" style={{ background: 'var(--golf-gold)', color: 'var(--golf-dark)' }}>닫기</button>
               </div>
             </div>

@@ -45,7 +45,7 @@ export default function Home() {
         if (data.auth_email) {
           setShowMigration(false);
           setLegacyUserId(null);
-          setError('You have already migrated your wallet. Please sign in with Google.');
+          setError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
           setIsLoading(false);
           return;
         }
@@ -55,11 +55,11 @@ export default function Home() {
         setIsLoading(false);
         return;
       } else {
-        setError(data.error || 'Invalid user ID or password');
+        setError(data.error || '잘못된 사용자 ID 또는 비밀번호');
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : '인증 실패');
     } finally {
       setIsLoading(false);
     }
@@ -103,13 +103,13 @@ export default function Home() {
           sessionStorage.setItem('walletPrivateKey', String(privateKey));
           router.push('/dashboard');
         } else {
-          setError('Failed to retrieve private key from Web3Auth.');
+          setError('Web3Auth에서 개인키를 가져오는데 실패했습니다.');
         }
       } else {
-        setError('Web3Auth provider not initialized.');
+        setError('Web3Auth 공급자가 초기화되지 않았습니다.');
       }
     } catch (err) {
-      setError('Google sign-in failed');
+      setError('Google 로그인 실패');
     } finally {
       setIsLoading(false);
       setShowGoogleModal(false);
@@ -260,7 +260,7 @@ export default function Home() {
               disabled={!agreeNewUser || isLoading}
               className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${agreeNewUser ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}`}
             >
-              {isLoading ? 'Connecting...' : 'Google로 계속하기'}
+              {isLoading ? '연결 중...' : 'Google로 계속하기'}
             </button>
             <button
               type="button"

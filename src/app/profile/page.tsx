@@ -38,8 +38,8 @@ export default function Profile() {
       try {
         // Fetch both native and token transfers
         const [nativeTxs, tokenTxs] = await Promise.all([
-          fetch(`https://api.polygonscan.com/api?module=account&action=txlist&address=${address}&sort=desc&apikey=JZB52EQ9Z4Z4AYMVSRM5PP3ERUJ2891I4R`).then(res => res.json()),
-          fetch(`https://api.polygonscan.com/api?module=account&action=tokentx&address=${address}&sort=desc&apikey=JZB52EQ9Z4Z4AYMVSRM5PP3ERUJ2891I4R`).then(res => res.json())
+          fetch(`https://api.etherscan.io/v2/api?chainid=137&module=account&action=txlist&address=${address}&sort=desc&apikey=MG6RJ6UYNEV5MWH9BABFHCYIJNGUNX248E`).then(res => res.json()),
+          fetch(`https://api.etherscan.io/v2/api?chainid=137&module=account&action=tokentx&address=${address}&sort=desc&apikey=MG6RJ6UYNEV5MWH9BABFHCYIJNGUNX248E`).then(res => res.json())
         ]);
 
         const nativeTransactions = nativeTxs.status === "1" && nativeTxs.result ? nativeTxs.result.map((tx: any) => ({
@@ -71,7 +71,7 @@ export default function Profile() {
         setTransactions(allTransactions);
         setError(null);
       } catch (error) {
-        setError('Failed to fetch transactions. Please try again later.');
+        setError('거래 내역을 불러오는데 실패했습니다. 나중에 다시 시도해주세요.');
         setTransactions([]);
       } finally {
         setIsLoading(false);
@@ -115,10 +115,10 @@ export default function Profile() {
                 })}
               </ul>
               {transactions.length > 5 && !showAll && (
-                <button className="btn" style={{ marginTop: 12, width: '100%', background: 'var(--golf-gold)', color: 'var(--golf-dark)', borderRadius: 12, fontWeight: 700 }} onClick={() => setShowAll(true)}>Show More</button>
+                <button className="btn" style={{ marginTop: 12, width: '100%', background: 'var(--golf-gold)', color: 'var(--golf-dark)', borderRadius: 12, fontWeight: 700 }} onClick={() => setShowAll(true)}>더 보기</button>
               )}
               {showAll && transactions.length > 5 && (
-                <button className="btn" style={{ marginTop: 12, width: '100%', background: 'var(--golf-accent)', color: 'var(--golf-dark)', borderRadius: 12, fontWeight: 700 }} onClick={() => setShowAll(false)}>Show Less</button>
+                <button className="btn" style={{ marginTop: 12, width: '100%', background: 'var(--golf-accent)', color: 'var(--golf-dark)', borderRadius: 12, fontWeight: 700 }} onClick={() => setShowAll(false)}>접기</button>
               )}
             </>
           ) : (

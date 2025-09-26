@@ -108,12 +108,12 @@ export default function Tokens() {
     setError(null);
     setIsAdding(true);
     if (!ethers.isAddress(newTokenAddress)) {
-      setError('Invalid token address');
+      setError('잘못된 토큰 주소입니다');
       setIsAdding(false);
       return;
     }
     if (!address) {
-      setError('No wallet address');
+      setError('지갑 주소가 없습니다');
       setIsAdding(false);
       return;
     }
@@ -272,7 +272,7 @@ export default function Tokens() {
                   {token.symbol === 'MATIC' ? <FaGolfBall size={20} color="var(--golf-gold)" /> : <FaFlagCheckered size={20} color="var(--golf-green)" />} {token.symbol}
                 </span>
                 <span>{token.balance}</span>
-                <button onClick={() => handleRemoveToken(token.address)} style={{ background: 'none', border: 'none', color: 'var(--golf-gold)', fontWeight: 700, cursor: 'pointer', fontSize: 18 }} title="Remove token">×</button>
+                <button onClick={() => handleRemoveToken(token.address)} style={{ background: 'none', border: 'none', color: 'var(--golf-gold)', fontWeight: 700, cursor: 'pointer', fontSize: 18 }} title="\ud1a0\ud070 \uc81c\uac70">×</button>
               </li>
             ))}
           </ul>

@@ -33,7 +33,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Login failed');
+        setError(data.error || '로그인 실패');
         setIsLoading(false);
         return;
       }
@@ -41,7 +41,7 @@ export default function LoginPage() {
       if (data.auth_email) {
         setShowMigration(false);
         setLegacyUserId(null);
-        setError('You have already migrated your wallet. Please sign in with Google.');
+        setError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
         setIsLoading(false);
         return;
       }
@@ -53,7 +53,7 @@ export default function LoginPage() {
       }
       router.push("/dashboard");
     } catch (err) {
-      setError("Login failed");
+      setError("로그인 실패");
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +69,7 @@ export default function LoginPage() {
       localStorage.setItem("userInfo", JSON.stringify(userInfo));
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to login with Web3Auth");
+      setError(err instanceof Error ? err.message : "Web3Auth 로그인 실패");
     } finally {
       setIsLoading(false);
     }
@@ -89,11 +89,11 @@ export default function LoginPage() {
         }),
       });
       if (!response.ok) {
-        throw new Error("Failed to migrate wallet");
+        throw new Error("지갑 마이그레이션 실패");
       }
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to migrate wallet");
+      setError(err instanceof Error ? err.message : "지갑 마이그레이션 실패");
     }
   };
 
@@ -110,13 +110,13 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setOldUserError(data.error || 'Login failed');
+        setOldUserError(data.error || '로그인 실패');
         setOldUserLoading(false);
         return;
       }
       // Handle migration or dashboard redirect as before
       if (data.auth_email) {
-        setOldUserError('You have already migrated your wallet. Please sign in with Google.');
+        setOldUserError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
         setOldUserLoading(false);
         return;
       }
@@ -129,7 +129,7 @@ export default function LoginPage() {
       }
       router.push("/dashboard");
     } catch (err) {
-      setOldUserError("Login failed");
+      setOldUserError("로그인 실패");
     } finally {
       setOldUserLoading(false);
     }
@@ -140,15 +140,15 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Sign in to your account
+            계정에 로그인
           </h2>
         </div>
 
         {/* WARNING & CHECKBOX */}
         <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded">
           <div className="mb-2 font-semibold">
-            If you are an <span className="text-red-600 font-bold">old user</span> and want your old wallet, please migrate first using your username and password.<br />
-            If you don't know your password, use <span className="underline">Forgot Password</span>.
+            만약 <span className="text-red-600 font-bold">기존 사용자</span>이고 이전 지갑을 원하신다면, 사용자 이름과 비밀번호로 먼저 마이그레이션하세요.<br />
+            비밀번호를 모르신다면 <span className="underline">비밀번호 찾기</span>를 사용하세요.
           </div>
           <div className="flex items-center mt-2">
             <input
@@ -158,7 +158,7 @@ export default function LoginPage() {
               onChange={e => setAgreeNewUser(e.target.checked)}
               className="mr-2"
             />
-            <label htmlFor="agreeNewUser" className="text-sm">I am a brand new user and want to create a new wallet.</label>
+            <label htmlFor="agreeNewUser" className="text-sm">저는 신규 사용자이며 새로운 지갑을 만들고 싶습니다.</label>
           </div>
         </div>
 
@@ -168,14 +168,14 @@ export default function LoginPage() {
             disabled={isLoading || !agreeNewUser}
             className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${agreeNewUser ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'}`}
           >
-            {isLoading ? "Connecting..." : "Continue with Google"}
+            {isLoading ? "연결 중..." : "Google로 계속하기"}
           </button>
           <button
             type="button"
             className="w-full mt-2 py-2 px-4 rounded-md border border-yellow-400 text-yellow-800 font-semibold bg-yellow-50 hover:bg-yellow-100"
             onClick={() => setShowOldUserModal(true)}
           >
-            Old user? Click here
+            기존 사용자이신가요? 여기를 클릭하세요
           </button>
 
           <div className="relative">
@@ -184,7 +184,7 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-sm">
               <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500">
-                Or continue with email
+                또는 이메일로 계속하기
               </span>
             </div>
           </div>
@@ -193,7 +193,7 @@ export default function LoginPage() {
             <div className="rounded-md shadow-sm -space-y-px">
               <div>
                 <label htmlFor="email" className="sr-only">
-                  Email address
+                  이메일 주소
                 </label>
                 <input
                   id="email"
@@ -203,12 +203,12 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Email address"
+                  placeholder="이메일 주소"
                 />
               </div>
               <div>
                 <label htmlFor="password" className="sr-only">
-                  Password
+                  비밀번호
                 </label>
                 <input
                   id="password"
@@ -218,7 +218,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Password"
+                  placeholder="비밀번호"
                 />
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function LoginPage() {
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 onClick={() => console.log("Sign in button clicked")}
               >
-                {isLoading ? "Signing in..." : "Sign in"}
+                {isLoading ? "로그인 중..." : "로그인"}
               </button>
             </div>
           </form>
@@ -242,12 +242,12 @@ export default function LoginPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full border border-yellow-400">
             <div className="mb-4 text-2xl font-bold text-yellow-600 flex items-center justify-center gap-2">
-              Old User Login
+              기존 사용자 로그인
             </div>
             <form onSubmit={handleOldUserLogin} className="space-y-4">
               <input
                 type="text"
-                placeholder="Username or Email"
+                placeholder="사용자 이름 또는 이메일"
                 value={oldUserEmail}
                 onChange={e => setOldUserEmail(e.target.value)}
                 className="w-full border rounded px-3 py-2"
@@ -255,7 +255,7 @@ export default function LoginPage() {
               />
               <input
                 type="password"
-                placeholder="Password"
+                placeholder="비밀번호"
                 value={oldUserPassword}
                 onChange={e => setOldUserPassword(e.target.value)}
                 className="w-full border rounded px-3 py-2"
@@ -267,14 +267,14 @@ export default function LoginPage() {
                   className="text-blue-600 underline text-sm"
                   onClick={() => { setShowOldUserModal(false); router.push('/forgot-password'); }}
                 >
-                  Forgot password?
+                  비밀번호를 잊으셨나요?
                 </button>
                 <button
                   type="button"
                   className="text-gray-500 text-sm"
                   onClick={() => setShowOldUserModal(false)}
                 >
-                  Cancel
+                  취소
                 </button>
               </div>
               {oldUserError && <div className="text-red-600 text-sm font-semibold mt-2">{oldUserError}</div>}
@@ -283,7 +283,7 @@ export default function LoginPage() {
                 className="w-full mt-2 py-2 px-4 rounded-md bg-yellow-500 text-white font-bold hover:bg-yellow-600"
                 disabled={oldUserLoading}
               >
-                {oldUserLoading ? 'Signing in...' : 'Sign In'}
+                {oldUserLoading ? '로그인 중...' : '로그인'}
               </button>
             </form>
           </div>
@@ -295,10 +295,10 @@ export default function LoginPage() {
           <div className="bg-white dark:bg-[#23262F] rounded-2xl shadow-2xl p-8 max-w-sm w-full border border-blue-400">
             <div className="mb-4 text-2xl font-bold text-yellow-600 flex items-center justify-center gap-2">
               <svg className="w-7 h-7 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9z" /></svg>
-              Email Authentication is Now Mandatory
+              이메일 인증이 필수입니다
             </div>
             <div className="mb-6 text-gray-700 dark:text-gray-200 text-center">
-              Please use Google login to continue.
+              계속하려면 Google 로그인을 사용하세요.
             </div>
             <button
               className="w-full bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-3 rounded-lg font-bold shadow hover:from-blue-600 hover:to-blue-800 transition-all duration-200"
@@ -308,7 +308,7 @@ export default function LoginPage() {
                 router.push('/');
               }}
             >
-              Login with Google
+              Google로 로그인
             </button>
           </div>
         </div>
