@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 
 async function generateHash() {
-  const password = 'test123'; // This is the password we want to hash
+  const password = process.argv[2] || 'example-password'; // Pass password as argument: npm run generate-hash mypassword
   const salt = await bcrypt.genSalt(10);
   const hash = await bcrypt.hash(password, salt);
   

@@ -45,9 +45,24 @@ export default function PortfolioValue({ mzsBalance, compact = false }: Portfoli
         setPrice(latestPrice);
         setPriceHistory(history);
         setError(null);
-      } catch (err) {
-        setError('Failed to fetch price data');
-        console.error(err);
+      } catch (err: any) {
+        // More specific error messaging based on error type
+        if (err?.response?.status === 503) {
+          setError('Price service temporarily unavailable - using cached data');
+        } else if (err?.code === 'ECONNABORTED') {
+          setError('Price service timeout - using cached data');
+        } else {
+          setError('Unable to fetch live prices - using cached data');
+        }
+        console.warn('Price fetch error (using fallback):', err);
+        
+        // Even on error, try to get fallback price to show something useful
+        try {
+          const fallbackPrice = await getLatestMZSPrice(); // This returns fallback on error
+          setPrice(fallbackPrice);
+        } catch {
+          setPrice(0.0053); // Final fallback
+        }
       } finally {
         setLoading(false);
       }
@@ -73,12 +88,12 @@ export default function PortfolioValue({ mzsBalance, compact = false }: Portfoli
     );
   }
 
-  if (error) {
+  if (error && !price) {
     return compact ? (
-      <div className="text-[var(--korean-red)]">{error}</div>
+      <div className="text-yellow-600">{error}</div>
     ) : (
-      <div className="p-4 bg-red-50 rounded-lg shadow-md">
-        <p className="text-red-600">{error}</p>
+      <div className="p-4 bg-yellow-50 rounded-lg shadow-md">
+        <p className="text-yellow-700">{error}</p>
       </div>
     );
   }
@@ -114,7 +129,14 @@ export default function PortfolioValue({ mzsBalance, compact = false }: Portfoli
       animate={{ opacity: 1, y: 0 }}
       className="p-6 bg-white rounded-lg shadow-md"
     >
-      <h2 className="text-2xl font-bold mb-4">Portfolio Value</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold">Portfolio Value</h2>
+        {error && (
+          <div className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+            Using cached data
+          </div>
+        )}
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>

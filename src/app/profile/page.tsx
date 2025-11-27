@@ -36,11 +36,15 @@ export default function Profile() {
     const fetchTransactions = async () => {
       if (!address) return;
       try {
-        // Fetch both native and token transfers
-        const [nativeTxs, tokenTxs] = await Promise.all([
-          fetch(`https://api.etherscan.io/v2/api?chainid=137&module=account&action=txlist&address=${address}&sort=desc&apikey=MG6RJ6UYNEV5MWH9BABFHCYIJNGUNX248E`).then(res => res.json()),
-          fetch(`https://api.etherscan.io/v2/api?chainid=137&module=account&action=tokentx&address=${address}&sort=desc&apikey=MG6RJ6UYNEV5MWH9BABFHCYIJNGUNX248E`).then(res => res.json())
-        ]);
+        // Fetch transactions using secure API endpoint
+        const response = await fetch(`/api/polygon/transactions?address=${address}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch transactions');
+        }
+        
+        const { nativeTxs, tokenTxs } = data;
 
         const nativeTransactions = nativeTxs.status === "1" && nativeTxs.result ? nativeTxs.result.map((tx: any) => ({
           hash: tx.hash,

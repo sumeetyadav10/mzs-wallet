@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { verifyAdminToken } from '@/lib/adminAuth';
+import { verifyAdminSession } from '@/lib/adminAuth';
+import { logger } from '@/lib/logger';
 
 if (!getApps().length) {
   initializeApp({
@@ -15,189 +16,207 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
-// Helper function to calculate user completeness score
-function getUserCompleteness(user: any): number {
-  const importantFields = ['created_at', 'migratedAt', 'password_hash', 'auth_email', 'address', 'private_key'];
-  return importantFields.filter(field => user[field] && user[field] !== '').length;
-}
-
-// Helper function to safely parse dates
-function parseDate(dateValue: any): Date | null {
-  if (!dateValue) return null;
-  
-  if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-    return dateValue.toDate();
-  }
-  
-  if (typeof dateValue === 'string') {
-    const parsed = new Date(dateValue);
-    return isNaN(parsed.getTime()) ? null : parsed;
-  }
-  
-  if (dateValue instanceof Date) {
-    return isNaN(dateValue.getTime()) ? null : dateValue;
-  }
-  
-  return null;
-}
-
-// Helper function to get email provider
-function getEmailProvider(email: string): string {
-  if (!email || typeof email !== 'string') return 'unknown';
-  const domain = email.split('@')[1]?.toLowerCase();
-  
-  const providers: Record<string, string> = {
-    'gmail.com': 'Gmail',
-    'yahoo.com': 'Yahoo',
-    'hotmail.com': 'Hotmail',
-    'outlook.com': 'Outlook',
-    'naver.com': 'Naver',
-    'daum.net': 'Daum',
-    'kakao.com': 'Kakao'
-  };
-  
-  return providers[domain] || 'Other';
-}
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // Verify admin authentication
-  const authResult = await verifyAdminToken(request);
+  const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 });
+    logger.warn('🚨 Unauthorized admin analytics access attempt', {
+      error: authResult.error,
+      ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
   }
 
   try {
-    // Fetch all users
-    const snapshot = await db.collection('mzs').get();
-    const allUsers = snapshot.docs.map(doc => ({
-      documentId: doc.id,
-      ...doc.data()
-    })) as any[];
+    logger.log('Generating admin analytics...');
 
-    // Deduplication logic - keep most complete document for each user_id
-    const userMap = new Map();
+    // Get all users
+    const usersSnapshot = await db.collection('users').get();
+    const allUsers = usersSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })) as any[];
+
+    // Deduplicate users by user_id - keep the entry with the most complete data
+    const uniqueUsers: any[] = [];
+    const userIdMap = new Map();
+    
+    // Function to score completeness of a user document
+    const getUserCompleteness = (user: any) => {
+      let score = 0;
+      const importantFields = ['created_at', 'migratedAt', 'password_hash', 'auth_email', 'address', 'private_key'];
+      importantFields.forEach(field => {
+        if (user[field]) score += 1;
+      });
+      return score;
+    };
     
     allUsers.forEach(user => {
       const userId = user.user_id;
-      if (!userId) return;
-      
-      const existing = userMap.get(userId);
-      if (!existing) {
-        userMap.set(userId, user);
-      } else {
-        // Compare completeness and keep the more complete one
-        const existingScore = getUserCompleteness(existing);
-        const currentScore = getUserCompleteness(user);
-        
-        if (currentScore > existingScore) {
-          userMap.set(userId, user);
-        } else if (currentScore === existingScore) {
-          // If same completeness, prefer the one with migration data
-          if (user.migratedAt && !existing.migratedAt) {
-            userMap.set(userId, user);
-          }
+      if (userId) {
+        const existing = userIdMap.get(userId);
+        if (!existing || getUserCompleteness(user) > getUserCompleteness(existing)) {
+          userIdMap.set(userId, user);
         }
+      } else {
+        // Keep users without user_id (might be incomplete records)
+        uniqueUsers.push(user);
       }
     });
 
-    const uniqueUsers = Array.from(userMap.values());
+    // Add deduplicated users to the array
+    uniqueUsers.push(...Array.from(userIdMap.values()));
 
-    // Analyze migration status
+    // Basic statistics (using deduplicated users)
+    const totalUsers = uniqueUsers.length;
+    const totalDocuments = allUsers.length;
+    const duplicateDocuments = totalDocuments - totalUsers;
+    
+    // Migrated users: Must have migration status AND complete user data
     const migratedUsers = uniqueUsers.filter(user => {
       const hasMigrationStatus = user.migratedAt || user.auth_email;
       const hasCompleteData = user.private_key && user.password_hash;
       return hasMigrationStatus && hasCompleteData;
-    });
-
+    }).length;
+    
+    // Legacy users: Users who don't meet the migrated criteria
     const legacyUsers = uniqueUsers.filter(user => {
-      return user.private_key && user.password_hash && !user.migratedAt && !user.auth_email;
-    });
+      const hasMigrationStatus = user.migratedAt || user.auth_email;
+      const hasCompleteData = user.private_key && user.password_hash;
+      return !(hasMigrationStatus && hasCompleteData);
+    }).length;
+    
+    const usersWithWallets = uniqueUsers.filter(user => user.address || user.private_key).length;
 
-    const incompleteUsers = uniqueUsers.filter(user => {
-      return !user.private_key || !user.password_hash;
-    });
-
-    // Field completeness analysis
-    const fieldStats = {
-      user_id: uniqueUsers.filter(u => u.user_id).length,
-      auth_email: uniqueUsers.filter(u => u.auth_email).length,
-      address: uniqueUsers.filter(u => u.address).length,
-      private_key: uniqueUsers.filter(u => u.private_key).length,
-      password_hash: uniqueUsers.filter(u => u.password_hash).length,
-      created_at: uniqueUsers.filter(u => u.created_at).length,
-      migratedAt: uniqueUsers.filter(u => u.migratedAt).length
+    // Migration statistics
+    const migrationStats = {
+      total: totalUsers,
+      migrated: migratedUsers,
+      legacy: legacyUsers,
+      migrationRate: totalUsers > 0 ? (migratedUsers / totalUsers * 100).toFixed(1) : 0,
+      totalDocuments,
+      duplicateDocuments
     };
 
-    // Email provider analysis
-    const emailProviders: Record<string, number> = {};
+    // User registration trends (by creation date) - using unique users only
+    const registrationTrends: Record<string, number> = {};
     uniqueUsers.forEach(user => {
-      if (user.auth_email) {
-        const provider = getEmailProvider(user.auth_email);
-        emailProviders[provider] = (emailProviders[provider] || 0) + 1;
+      if (user.created_at) {
+        try {
+          const dateObj = new Date(user.created_at);
+          if (!isNaN(dateObj.getTime())) {
+            const date = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+            registrationTrends[date] = (registrationTrends[date] || 0) + 1;
+          }
+        } catch (error) {
+          // Skip invalid dates
+          logger.log('Invalid date found:', user.created_at);
+        }
       }
     });
 
-    // Date analysis
-    const now = new Date();
-    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const recentCreations = uniqueUsers.filter(user => {
-      const createdAt = parseDate(user.created_at);
-      return createdAt && createdAt > last30Days;
+    // Recent activity (unique users created in last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const recentUsers = uniqueUsers.filter(user => {
+      if (!user.created_at) return false;
+      try {
+        const userDate = new Date(user.created_at);
+        return !isNaN(userDate.getTime()) && userDate >= thirtyDaysAgo;
+      } catch (error) {
+        return false;
+      }
     }).length;
 
-    const recentMigrations = uniqueUsers.filter(user => {
-      const migratedAt = parseDate(user.migratedAt);
-      return migratedAt && migratedAt > last30Days;
-    }).length;
+    // Auth Email providers analysis (unique users only)
+    const authEmailProviders: Record<string, number> = {};
+    uniqueUsers.forEach(user => {
+      if (user.auth_email) {
+        const domain = user.auth_email.split('@')[1];
+        authEmailProviders[domain] = (authEmailProviders[domain] || 0) + 1;
+      }
+    });
 
-    // Health metrics
-    const duplicateUserIds = allUsers.length - uniqueUsers.length;
-    const usersWithoutId = allUsers.filter(u => !u.user_id).length;
-    const usersWithoutKey = uniqueUsers.filter(u => !u.private_key).length;
-
-    // Compile analytics
-    const analytics = {
-      overview: {
-        totalDocuments: allUsers.length,
-        totalUniqueUsers: uniqueUsers.length,
-        duplicateDocuments: duplicateUserIds
-      },
-      userTypes: {
-        migratedUsers: migratedUsers.length,
-        legacyUsers: legacyUsers.length,
-        incompleteUsers: incompleteUsers.length
-      },
-      fieldCompleteness: {
-        ...fieldStats,
-        completenessPercentages: Object.fromEntries(
-          Object.entries(fieldStats).map(([field, count]) => [
-            field, 
-            Math.round((count / uniqueUsers.length) * 100)
-          ])
-        )
-      },
-      emailProviders,
-      timeAnalysis: {
-        recentCreations30Days: recentCreations,
-        recentMigrations30Days: recentMigrations,
-        totalWithCreationDate: fieldStats.created_at,
-        totalWithMigrationDate: fieldStats.migratedAt
-      },
-      healthMetrics: {
-        duplicateUserIds,
-        usersWithoutId,
-        usersWithoutPrivateKey: usersWithoutKey,
-        healthScore: Math.round(((uniqueUsers.length - usersWithoutKey - usersWithoutId) / uniqueUsers.length) * 100)
-      },
-      generatedAt: new Date().toISOString()
+    // Field completeness analysis (unique users only)
+    const fieldCompleteness = {
+      hasUserId: uniqueUsers.filter(u => u.user_id).length,
+      hasAuthEmail: uniqueUsers.filter(u => u.auth_email).length,
+      hasLegacyEmail: uniqueUsers.filter(u => u.email && !u.auth_email).length,
+      hasAddress: uniqueUsers.filter(u => u.address).length,
+      hasPrivateKey: uniqueUsers.filter(u => u.private_key).length,
+      hasPassword: uniqueUsers.filter(u => u.password_hash).length,
     };
 
-    return NextResponse.json(analytics);
+    // Get admin logs
+    let recentAdminActions: any[] = [];
+    try {
+      const adminLogsSnapshot = await db.collection('admin_logs')
+        .orderBy('timestamp', 'desc')
+        .limit(10)
+        .get();
+      
+      recentAdminActions = adminLogsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      logger.log('Admin logs collection may not exist yet');
+    }
+
+    // Get password reset requests
+    let recentResetRequests: any[] = [];
+    try {
+      const resetRequestsSnapshot = await db.collection('password_reset_requests')
+        .orderBy('createdAt', 'desc')
+        .limit(5)
+        .get();
+      
+      recentResetRequests = resetRequestsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      logger.log('Password reset requests collection may not exist yet');
+    }
+
+    // Database health metrics - only check for duplicate auth_emails
+    const duplicateAuthEmails: Record<string, number> = {};
+    
+    allUsers.forEach(user => {
+      if (user.auth_email) {
+        duplicateAuthEmails[user.auth_email] = (duplicateAuthEmails[user.auth_email] || 0) + 1;
+      }
+    });
+
+    const duplicateAuthEmailCount = Object.values(duplicateAuthEmails).filter((count: number) => count > 1).length;
+
+    return NextResponse.json({
+      overview: {
+        totalUsers,
+        usersWithWallets,
+        recentUsers,
+        migrationRate: migrationStats.migrationRate
+      },
+      migrationStats,
+      registrationTrends: Object.entries(registrationTrends)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-30), // Last 30 days
+      authEmailProviders: Object.entries(authEmailProviders)
+        .sort(([,a], [,b]) => (b as number) - (a as number))
+        .slice(0, 10),
+      fieldCompleteness,
+      recentAdminActions,
+      recentResetRequests,
+      healthMetrics: {
+        duplicateAuthEmails: duplicateAuthEmailCount,
+        totalDocuments,
+        uniqueUsers: totalUsers,
+        duplicateDocuments,
+        orphanedRecords: uniqueUsers.filter(u => !u.user_id && !u.auth_email).length
+      },
+      generatedAt: new Date().toISOString(),
+      generatedBy: authResult.email
+    });
 
   } catch (error) {
-    console.error('Error generating analytics:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Analytics error:', error);
+    return NextResponse.json({ error: 'Failed to generate analytics' }, { status: 500 });
   }
 } 

@@ -2,7 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ethers } from "ethers";
-import { FaGolfBall } from 'react-icons/fa';
+import { FaGolfBall, FaShieldAlt } from 'react-icons/fa';
+import { useCaptcha } from '@/components/security/CaptchaProvider';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 export default function ForgotPassword() {
   const [step, setStep] = useState<"address" | "showUid" | "reset" | "done">("address");
@@ -13,25 +15,53 @@ export default function ForgotPassword() {
   const [identityProof, setIdentityProof] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaValue, setCaptchaValue] = useState<string | null>(null);
   const router = useRouter();
+  const { executeRecaptcha } = useCaptcha();
+  
+  // Debug: Check reCAPTCHA configuration
+  console.log('reCAPTCHA site key configured:', !!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY);
 
   // Step 1: Find user by address and submit request
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
+    
     try {
-      // Find UID by address
-      const res = await fetch("/api/auth/find-user-by-address", {
+      // CAPTCHA verification - REQUIRED for security
+      console.log('🔒 Verifying CAPTCHA for forgot password...');
+      
+      let token = captchaValue; // Use visible reCAPTCHA first
+      
+      if (!token) {
+        // Fallback to invisible reCAPTCHA v3
+        console.log('🔒 Executing invisible reCAPTCHA v3...');
+        token = await executeRecaptcha('forgot_password');
+      }
+      
+      if (!token) {
+        setError('CAPTCHA 인증이 필요합니다. reCAPTCHA를 완료하고 다시 시도해주세요.');
+        setIsLoading(false);
+        return;
+      }
+      console.log('✅ CAPTCHA verification successful');
+      setCaptchaToken(token);
+      // Find UID by address with CAPTCHA token
+      const res = await fetch("/api/auth2025/auth/find-user-by-address", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ 
+          address,
+          captchaToken: token // Include CAPTCHA token for this API too
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "사용자를 찾을 수 없습니다");
       setUserId(data.user_id);
-      // Submit password reset request
-      const reqRes = await fetch("/api/auth/request-password-reset", {
+      // Submit password reset request with CAPTCHA token
+      const reqRes = await fetch("/api/auth2025/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -39,6 +69,7 @@ export default function ForgotPassword() {
           userId: data.user_id,
           requestedPassword: newPassword,
           identityProof,
+          captchaToken: token, // Include CAPTCHA token for backend verification
         }),
       });
       const reqData = await reqRes.json();
@@ -121,8 +152,85 @@ export default function ForgotPassword() {
               style={{ marginBottom: 12 }}
               disabled={isLoading}
             />
-            <button type="submit" className="btn" style={{ fontSize: '1.1em', marginBottom: 8 }} disabled={isLoading}>
-              {isLoading ? '전송 중...' : '요청 보내기'}
+            {/* CAPTCHA Widget */}
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              marginBottom: '16px',
+              padding: '12px',
+              background: 'rgba(26, 219, 116, 0.1)', 
+              border: '1px solid rgba(26, 219, 116, 0.3)', 
+              borderRadius: '8px'
+            }}>
+              <div style={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '12px'
+              }}>
+                <FaShieldAlt color="var(--golf-green)" size={16} />
+                <span style={{ fontSize: '0.9em', color: 'var(--golf-green)', fontWeight: 600 }}>
+                  보안 인증 (reCAPTCHA)
+                </span>
+              </div>
+              
+              {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ? (
+                <ReCAPTCHA
+                  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+                  onChange={(value) => {
+                    console.log('reCAPTCHA value changed:', value);
+                    setCaptchaValue(value);
+                  }}
+                  onExpired={() => {
+                    console.log('reCAPTCHA expired');
+                    setCaptchaValue(null);
+                  }}
+                  onError={() => {
+                    console.log('reCAPTCHA error');
+                    setCaptchaValue(null);
+                  }}
+                  theme="light"
+                  size="normal"
+                />
+              ) : (
+                <div style={{
+                  padding: '12px 20px',
+                  background: 'rgba(255, 193, 7, 0.2)',
+                  border: '1px solid rgba(255, 193, 7, 0.5)',
+                  borderRadius: '6px',
+                  color: '#856404',
+                  fontSize: '0.85em',
+                  textAlign: 'center'
+                }}>
+                  🔧 개발 모드: reCAPTCHA 자동 승인됨
+                </div>
+              )}
+            </div>
+            
+            <button 
+              type="submit" 
+              className="btn" 
+              style={{ 
+                fontSize: '1.1em', 
+                marginBottom: 8,
+                opacity: (!captchaValue && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) ? 0.5 : 1
+              }} 
+              disabled={isLoading || (!captchaValue && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY)}
+            >
+              {isLoading ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <FaShieldAlt /> 보안 검증 중...
+                </span>
+              ) : (!captchaValue && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) ? (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <FaShieldAlt /> reCAPTCHA 완료 필요
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <FaShieldAlt /> 보안 인증 후 전송
+                </span>
+              )}
             </button>
             {error && <div style={{ color: 'red', marginBottom: 8, fontWeight: 600 }}>{error}</div>}
           </form>

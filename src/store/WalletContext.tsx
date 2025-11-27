@@ -174,18 +174,33 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const email = userInfo.email;
           
           if (email) {
-            console.log('[WalletContext] Loading Tron wallet for email:', email);
-            const tronWalletData = await getTronWallet(email);
-            console.log('[WalletContext] Tron wallet loaded:', tronWalletData);
-            setTronWallet(tronWalletData);
-            if (selectedChain === 'tron') {
-              setAddress(tronWalletData.address);
+            try {
+              console.log('[WalletContext] Loading Tron wallet for authenticated user');
+              const tronWalletData = await getTronWallet();
+              console.log('[WalletContext] Tron wallet loaded:', tronWalletData);
+              setTronWallet(tronWalletData);
+              if (selectedChain === 'tron') {
+                setAddress(tronWalletData.address);
+              }
+            } catch (tronError) {
+              // Don't let Tron issues break the entire wallet
+              if (process.env.NODE_ENV === 'development') {
+                console.warn('[WalletContext] Tron wallet failed to load:', tronError);
+              }
+              // Set null Tron wallet but continue with other functionality
+              setTronWallet(null);
+              
+              // If user was on Tron chain, switch to polygon as fallback
+              if (selectedChain === 'tron') {
+                setSelectedChain('polygon');
+                setAddress(wallet.address); // Use main wallet address
+              }
             }
           } else {
             console.log('[WalletContext] No email found in userInfo');
           }
         } catch (err) {
-          console.error('Failed to load Tron wallet:', err);
+          console.error('Failed to load wallet context:', err);
         }
       }
     };

@@ -7,6 +7,7 @@ import UserManager from './components/UserManager';
 import { ethers } from 'ethers';
 import { adminApi, AdminApiError } from '@/lib/adminApi';
 import { useAdminAuth } from '@/lib/AdminAuthContext';
+import { useRouter } from 'next/navigation';
 
 interface PasswordResetRequest {
   requestId: string;
@@ -64,7 +65,8 @@ const MZS_ABI = [
 const MZS_ADDRESS = "0x1aDb749FFDA33251e1503672951b5A4234518Fa7";
 
 export default function AdminPanel() {
-  const { user, isAdmin, loading: authLoading } = useAdminAuth();
+  const router = useRouter();
+  const { user, isAdmin, loading: authLoading, sessionToken, logout } = useAdminAuth();
   const [activeTab, setActiveTab] = useState<'recovery' | 'search' | 'analytics'>('recovery');
   
   // Recovery requests state
@@ -87,18 +89,27 @@ export default function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && (!user || !isAdmin || !sessionToken)) {
+      setRedirecting(true);
+      router.push('/admin/login');
+    }
+  }, [authLoading, user, isAdmin, sessionToken, router]);
 
   // Load recovery requests on mount and tab change
   useEffect(() => {
     // Only fetch data if user is authenticated and is admin
-    if (!authLoading && user && isAdmin) {
+    if (!authLoading && user && isAdmin && sessionToken) {
       if (activeTab === 'recovery') {
         fetchRequests();
       } else if (activeTab === 'analytics' && !analytics) {
         fetchAnalytics();
       }
     }
-  }, [activeTab, authLoading, user, isAdmin]);
+  }, [activeTab, authLoading, user, isAdmin, sessionToken]);
 
   // Filter recovery requests
   useEffect(() => {
@@ -285,29 +296,24 @@ export default function AdminPanel() {
     }
   };
 
-  // Show loading state while authentication is being checked
-  if (authLoading) {
+  // Show loading state while authentication is being checked or redirecting
+  if (authLoading || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--golf-gradient)]">
         <div className="golf-pattern absolute inset-0 pointer-events-none"></div>
         <div className="relative z-10 text-center">
           <FaSpinner className="animate-spin text-[var(--golf-gold)] mx-auto mb-4" size={48} />
-          <div className="text-[var(--golf-dark)] font-semibold text-lg">인증 확인 중...</div>
+          <div className="text-[var(--golf-dark)] font-semibold text-lg">
+            {authLoading ? '인증 확인 중...' : '관리자 로그인으로 이동 중...'}
+          </div>
         </div>
       </div>
     );
   }
 
   // Don't render the admin panel if user is not authenticated or not admin
-  if (!user || !isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--golf-gradient)]">
-        <div className="golf-pattern absolute inset-0 pointer-events-none"></div>
-        <div className="relative z-10 text-center">
-          <div className="text-[var(--golf-dark)] font-semibold text-lg">접근 권한이 없습니다.</div>
-        </div>
-      </div>
-    );
+  if (!user || !isAdmin || !sessionToken) {
+    return null; // Return nothing while redirect happens
   }
 
   return (
@@ -337,6 +343,15 @@ export default function AdminPanel() {
                 </svg>
               )}
               새로고침
+            </button>
+            <button
+              onClick={logout}
+              className="glass px-4 py-2 rounded-xl border border-red-500/30 text-red-600 font-semibold flex items-center gap-2 hover:bg-red-500/10 transition-all duration-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              로그아웃
             </button>
           </div>
         </div>

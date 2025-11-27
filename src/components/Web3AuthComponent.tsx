@@ -30,13 +30,6 @@ export default function Web3AuthComponent() {
       const web3authInstance = new Web3Auth({
         clientId,
         privateKeyProvider,
-        uiConfig: {
-          appName: "MZS Wallet",
-          logoLight: "/logo.png",
-          logoDark: "/logo.png",
-          defaultLanguage: "en",
-          mode: "dark",
-        },
       });
       const adapter = new OpenloginAdapter({
         adapterSettings: {

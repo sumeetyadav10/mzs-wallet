@@ -1,8 +1,6 @@
 'use client';
-import { WalletProvider } from '@/store/WalletContext';
-import { Web3AuthProvider } from "@/lib/web3auth/Web3AuthProvider";
+import { AppProviders } from '@/components/AppProviders';
 import './globals.css';
-import Image from 'next/image';
 
 export default function RootLayout({
   children,
@@ -13,14 +11,13 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin" />
+        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
       </head>
       <body>
         <main style={{maxWidth: '600px', margin: '0 auto', background: 'var(--white)', borderRadius: '18px', boxShadow: 'var(--shadow)', padding: '2em 0'}}>
-          <Web3AuthProvider>
-          <WalletProvider>
+          <AppProviders>
             {children}
-          </WalletProvider>
-          </Web3AuthProvider>
+          </AppProviders>
         </main>
       </body>
     </html>

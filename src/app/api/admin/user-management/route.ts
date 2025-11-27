@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { verifyAdminToken } from '@/lib/adminAuth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { verifyAdminSession } from '@/lib/adminAuth';
+import { logger } from '@/lib/logger';
 
 if (!getApps().length) {
   initializeApp({
@@ -15,228 +16,178 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
-// Fields that can be safely updated
-const UPDATABLE_FIELDS = [
-  'user_id',
-  'auth_email',
-  'address',
-  'created_at',
-  'migratedAt',
-  'migrated'
-];
+export const dynamic = 'force-dynamic';
 
-// Fields that require special confirmation to delete
-const CRITICAL_FIELDS = ['private_key', 'password_hash'];
-
-// GET: Fetch user by document ID
+// GET: Get user by document ID
 export async function GET(request: NextRequest) {
-  const authResult = await verifyAdminToken(request);
+  const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 });
+    logger.warn('🚨 Unauthorized admin user-management GET access attempt', {
+      error: authResult.error,
+      ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const docId = searchParams.get('docId');
+
+  if (!docId) {
+    return NextResponse.json({ error: 'Document ID required' }, { status: 400 });
   }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const documentId = searchParams.get('documentId');
-
-    if (!documentId) {
-      return NextResponse.json({ error: 'documentId is required' }, { status: 400 });
-    }
-
-    const doc = await db.collection('mzs').doc(documentId).get();
+    const doc = await db.collection('users').doc(docId).get();
     
     if (!doc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const userData = {
-      documentId: doc.id,
-      ...doc.data()
-    } as any;
-
-    // Log admin access
-    await db.collection('admin_logs').add({
-      action: 'view_user',
-      adminEmail: authResult.email,
-      timestamp: new Date().toISOString(),
-      details: { documentId, userId: userData.user_id }
+    const userData = { docId: doc.id, ...doc.data() };
+    
+    // Remove sensitive fields before returning
+    const sanitizedData: any = { ...userData };
+    ['password_hash', 'private_key', 'mnemonic', 'seed'].forEach(field => {
+      delete sanitizedData[field];
     });
-
-    return NextResponse.json({ user: userData });
-
+    
+    return NextResponse.json({ user: sanitizedData });
   } catch (error) {
-    console.error('Error fetching user:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Get user error:', error);
+    return NextResponse.json({ error: 'Failed to get user' }, { status: 500 });
   }
 }
 
 // PUT: Update user fields
 export async function PUT(request: NextRequest) {
-  const authResult = await verifyAdminToken(request);
+  const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 });
+    logger.warn('🚨 Unauthorized admin user-management PUT access attempt', {
+      error: authResult.error,
+      ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
   }
 
   try {
-    const { documentId, updates, adminNote } = await request.json();
+    const { docId, updates, adminAction } = await request.json();
 
-    if (!documentId) {
-      return NextResponse.json({ error: 'documentId is required' }, { status: 400 });
+    if (!docId) {
+      return NextResponse.json({ error: 'Document ID required' }, { status: 400 });
     }
 
-    if (!updates || typeof updates !== 'object') {
-      return NextResponse.json({ error: 'updates object is required' }, { status: 400 });
+    if (!updates || Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'Updates required' }, { status: 400 });
     }
 
-    // Validate updateable fields
-    const invalidFields = Object.keys(updates).filter(field => !UPDATABLE_FIELDS.includes(field));
-    if (invalidFields.length > 0) {
-      return NextResponse.json({ 
-        error: `Cannot update fields: ${invalidFields.join(', ')}. Allowed fields: ${UPDATABLE_FIELDS.join(', ')}` 
-      }, { status: 400 });
-    }
-
-    const doc = await db.collection('mzs').doc(documentId).get();
-    if (!doc.exists) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    const oldData = doc.data();
-    
-    // Prepare update data with timestamp
-    const updateData = {
+    // Add admin audit trail
+    const auditData = {
       ...updates,
-      adminUpdatedAt: new Date().toISOString(),
-      adminUpdatedBy: authResult.email
+      lastModifiedBy: authResult.email,
+      lastModifiedAt: new Date().toISOString(),
+      adminAction: adminAction || 'field_update'
     };
 
-    // Update the document
-    await doc.ref.update(updateData);
+    await db.collection('users').doc(docId).update(auditData);
 
-    // Log the changes
+    // Log the action
     await db.collection('admin_logs').add({
-      action: 'update_user',
+      action: 'user_update',
       adminEmail: authResult.email,
+      targetDocId: docId,
+      updates: Object.keys(updates),
       timestamp: new Date().toISOString(),
-      details: {
-        documentId,
-        userId: oldData?.user_id,
-        oldData: Object.keys(updates).reduce((acc, key) => {
-          acc[key] = oldData?.[key];
-          return acc;
-        }, {} as any),
-        newData: updates,
-        adminNote: adminNote || null
-      }
+      adminAction
     });
 
     return NextResponse.json({ 
       success: true, 
-      message: `Updated ${Object.keys(updates).length} field(s)`,
+      message: 'User updated successfully',
       updatedFields: Object.keys(updates)
     });
 
   } catch (error) {
-    console.error('Error updating user:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Update user error:', error);
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
   }
 }
 
 // DELETE: Delete user or specific fields
 export async function DELETE(request: NextRequest) {
-  const authResult = await verifyAdminToken(request);
+  const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 });
+    logger.warn('🚨 Unauthorized admin user-management DELETE access attempt', {
+      error: authResult.error,
+      ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
   }
 
   try {
-    const { documentId, fieldsToDelete, confirmationCode } = await request.json();
+    const { docId, fieldsToDelete, deleteEntireDoc, confirmationCode } = await request.json();
 
-    if (!documentId) {
-      return NextResponse.json({ error: 'documentId is required' }, { status: 400 });
+    if (!docId) {
+      return NextResponse.json({ error: 'Document ID required' }, { status: 400 });
     }
 
-    const doc = await db.collection('mzs').doc(documentId).get();
-    if (!doc.exists) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Security check - require confirmation code for destructive operations
+    if (confirmationCode !== 'DELETE_CONFIRMED') {
+      return NextResponse.json({ error: 'Invalid confirmation code' }, { status: 400 });
     }
 
-    const userData = doc.data();
+    if (deleteEntireDoc) {
+      // Delete entire document
+      await db.collection('users').doc(docId).delete();
 
-    if (fieldsToDelete && Array.isArray(fieldsToDelete)) {
-      // Delete specific fields
-      const hasCriticalFields = fieldsToDelete.some(field => CRITICAL_FIELDS.includes(field));
-      
-      if (hasCriticalFields && confirmationCode !== 'DELETE_CONFIRMED') {
-        return NextResponse.json({ 
-          error: 'Deleting critical fields requires confirmation code: DELETE_CONFIRMED' 
-        }, { status: 400 });
-      }
-
-      // Create update object to remove fields
-      const fieldUpdates: any = {};
-      fieldsToDelete.forEach(field => {
-        fieldUpdates[field] = null; // Firestore uses null to delete fields
-      });
-
-      fieldUpdates.adminDeletedFieldsAt = new Date().toISOString();
-      fieldUpdates.adminDeletedFieldsBy = authResult.email;
-
-      await doc.ref.update(fieldUpdates);
-
-      // Log field deletion
+      // Log the action
       await db.collection('admin_logs').add({
-        action: 'delete_user_fields',
+        action: 'user_delete_complete',
         adminEmail: authResult.email,
-        timestamp: new Date().toISOString(),
-        details: {
-          documentId,
-          userId: userData?.user_id,
-          deletedFields: fieldsToDelete,
-          originalData: fieldsToDelete.reduce((acc, field) => {
-            acc[field] = userData?.[field];
-            return acc;
-          }, {} as any)
-        }
+        targetDocId: docId,
+        timestamp: new Date().toISOString()
       });
 
       return NextResponse.json({ 
         success: true, 
-        message: `Deleted ${fieldsToDelete.length} field(s)`,
+        message: 'User deleted completely',
+        action: 'complete_deletion'
+      });
+
+    } else if (fieldsToDelete && fieldsToDelete.length > 0) {
+      // Delete specific fields
+      const updates: any = {};
+      fieldsToDelete.forEach((field: string) => {
+        updates[field] = FieldValue.delete();
+      });
+
+      // Add audit info
+      updates.lastModifiedBy = authResult.email;
+      updates.lastModifiedAt = new Date().toISOString();
+      updates.adminAction = 'field_deletion';
+
+      await db.collection('users').doc(docId).update(updates);
+
+      // Log the action
+      await db.collection('admin_logs').add({
+        action: 'user_fields_delete',
+        adminEmail: authResult.email,
+        targetDocId: docId,
+        deletedFields: fieldsToDelete,
+        timestamp: new Date().toISOString()
+      });
+
+      return NextResponse.json({ 
+        success: true, 
+        message: `Deleted fields: ${fieldsToDelete.join(', ')}`,
         deletedFields: fieldsToDelete
       });
 
     } else {
-      // Delete entire user document
-      if (confirmationCode !== 'DELETE_CONFIRMED') {
-        return NextResponse.json({ 
-          error: 'Deleting user requires confirmation code: DELETE_CONFIRMED' 
-        }, { status: 400 });
-      }
-
-      // Log before deletion
-      await db.collection('admin_logs').add({
-        action: 'delete_user',
-        adminEmail: authResult.email,
-        timestamp: new Date().toISOString(),
-        details: {
-          documentId,
-          userId: userData?.user_id,
-          deletedUserData: userData
-        }
-      });
-
-      // Delete the document
-      await doc.ref.delete();
-
-      return NextResponse.json({ 
-        success: true, 
-        message: 'User deleted successfully'
-      });
+      return NextResponse.json({ error: 'Specify fields to delete or set deleteEntireDoc=true' }, { status: 400 });
     }
 
   } catch (error) {
-    console.error('Error deleting user/fields:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Delete operation error:', error);
+    return NextResponse.json({ error: 'Delete operation failed' }, { status: 500 });
   }
 } 

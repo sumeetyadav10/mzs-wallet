@@ -1,12 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createUser } from '@/lib/database';
 import { ethers } from 'ethers';
 import { motion } from 'framer-motion';
 import MigrationModal from '@/components/MigrationModal';
-import { useWeb3Auth } from '@/lib/web3auth/Web3AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
+import { useSecureAuth } from '@/hooks/useSecureAuth';
+import { useCaptcha } from '@/components/security/CaptchaProvider';
+import ReCAPTCHA from 'react-google-recaptcha';
+import { SecureAPIClient, SecurityLogger, FrontendSecurity } from '@/lib/security/frontend-security';
 import { FaGolfBall } from 'react-icons/fa';
 
 export default function Home() {
@@ -17,6 +21,10 @@ export default function Home() {
   const [redirecting, setRedirecting] = useState(false);
   const [showMigration, setShowMigration] = useState(false);
   const [legacyUserId, setLegacyUserId] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [recaptchaV2Token, setRecaptchaV2Token] = useState<string | null>(null);
+  const recaptchaV2Ref = useRef<ReCAPTCHA>(null);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [agreeNewUser, setAgreeNewUser] = useState(false);
   const [showOldUserModal, setShowOldUserModal] = useState(false);
@@ -25,27 +33,167 @@ export default function Home() {
   const [oldUserError, setOldUserError] = useState<string | null>(null);
   const [oldUserLoading, setOldUserLoading] = useState(false);
   const router = useRouter();
-  const { connect, getUserInfo, isLoading: web3authLoading, web3auth } = useWeb3Auth();
+  const { connect, getUserInfo, getIdToken, isLoading: web3authLoading, web3auth, isConnected, isMobile, closeAuthPopup } = useAuth();
+  const { authenticateSecurely } = useSecureAuth();
+  const { executeRecaptcha, isLoaded: captchaLoaded } = useCaptcha();
+
+  // 🔐 AUTO-REDIRECT IF ALREADY LOGGED IN
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      // Don't check during initial Web3Auth loading
+      if (web3authLoading) return;
+      
+      try {
+        // Check if user is already connected via Web3Auth
+        if (isConnected) {
+          console.log('🔍 Found Web3Auth session, but need to fetch wallet from Firestore...');
+          
+          try {
+            // Get user info from Web3Auth session
+            const userInfo = await getUserInfo();
+            if (userInfo?.email) {
+              console.log('📧 Getting existing wallet from Firestore for:', userInfo.email);
+              
+              // 🔐 SECURE: Fetch existing wallet using secure endpoint
+              const accessToken = sessionStorage.getItem('accessToken');
+              if (!accessToken) {
+                console.log('No access token found for wallet access');
+                return;
+              }
+              
+              console.log('🔐 Accessing wallet with stored access token + device verification...');
+              // Get user email from stored userInfo
+              const storedUserInfo = localStorage.getItem('userInfo');
+              const parsedUserInfo = storedUserInfo ? JSON.parse(storedUserInfo) : null;
+              const userEmail = parsedUserInfo?.email;
+              
+              if (!userEmail) {
+                console.log('No user email available for wallet access');
+                return;
+              }
+              
+              // Generate device fingerprint for verification
+              const deviceFingerprint = FrontendSecurity.generateDeviceFingerprint();
+              
+              const walletRes = await fetch(`/api/${process.env.NEXT_PUBLIC_API_USER_WALLET}`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${accessToken}`,
+                  'X-Device-Fingerprint': deviceFingerprint,
+                  'X-Timestamp': Date.now().toString()
+                },
+                body: JSON.stringify({
+                  email: userEmail
+                })
+              });
+              
+              if (!walletRes.ok) {
+                const errorText = await walletRes.text();
+                console.log('Wallet access failed:', errorText);
+                return;
+              }
+              
+              const data = await walletRes.json();
+              
+              if (data && (data.encryptedPrivateKey || data.private_key)) {
+                console.log('✅ Found existing wallet in Firestore with enhanced security');
+                // Store encrypted private key securely
+                const keyToStore = data.encryptedPrivateKey || data.private_key;
+                sessionStorage.setItem('walletPrivateKey', keyToStore);
+                sessionStorage.setItem('keyEncrypted', data.encryptedPrivateKey ? 'true' : 'false');
+                if (data.user_id) {
+                  sessionStorage.setItem('userId', data.user_id);
+                }
+                localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                
+                console.log('🚀 Using Firestore wallet, redirecting to dashboard...');
+                setRedirecting(true);
+                router.push('/dashboard');
+                return;
+              } else {
+                // If no wallet found in Firestore, show error
+                console.log('❌ No existing wallet found in Firestore for session');
+                setError('기존 지갑을 찾을 수 없습니다. 먼저 웹 앱에서 지갑을 생성해주세요.');
+                return;
+              }
+            }
+          } catch (error) {
+            console.log('❌ Error fetching wallet from Firestore:', error);
+            setError('지갑 로딩 오류가 발생했습니다. 다시 로그인해주세요.');
+            return;
+          }
+        }
+        
+        // Check localStorage for saved session
+        const savedUserInfo = localStorage.getItem('userInfo');
+        const savedPrivateKey = sessionStorage.getItem('walletPrivateKey');
+        
+        if (savedUserInfo && savedPrivateKey) {
+          console.log('📱 Found existing session, redirecting to dashboard...');
+          setRedirecting(true);
+          router.push('/dashboard');
+          return;
+        }
+        
+        console.log('📋 No existing session found, showing login page');
+      } catch (error) {
+        console.log('⚠️ Session check failed:', error);
+      }
+    };
+
+    checkExistingSession();
+  }, [web3authLoading, isConnected, router]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setCaptchaError(null);
     setIsLoading(true);
+    
     try {
-      console.log('Attempting login for user:', userId);
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId, password })
+      // Check if reCAPTCHA v2 is completed
+      if (!recaptchaV2Token) {
+        setCaptchaError('reCAPTCHA 확인을 완료해주세요.');
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('🔐 reCAPTCHA v2 verified, attempting SECURE login for user:', userId);
+      
+      // Log security event
+      SecurityLogger.logSecurityEvent({
+        type: 'AUTH_ATTEMPT',
+        userId,
+        success: false, // Will update on success
+        details: { method: 'secure_auth', userAgent: navigator.userAgent }
       });
-      const data = await res.json();
-      console.log('Login response:', { ...data, private_key: data.private_key ? '[REDACTED]' : null });
-      if (res.ok && data.private_key) {
+      
+      // Use secure authentication method (maintains security while using direct API)
+      const data = await SecureAPIClient.authenticateSecure(userId, password, recaptchaV2Token);
+      
+      // Log successful authentication
+      SecurityLogger.logSecurityEvent({
+        type: 'AUTH_ATTEMPT',
+        userId,
+        success: true,
+        details: { 
+          method: 'secure_legacy_auth', 
+          hasEncryptedKey: !!data.encryptedPrivateKey,
+          isAdmin: data.isAdmin || false,
+          securityVersion: data.securityInfo?.version || '2.0'
+        }
+      });
+      
+      if (data.accessToken && data.encryptedPrivateKey) {
+        // Store access token for authenticated API calls
+        sessionStorage.setItem('accessToken', data.accessToken);
+        sessionStorage.setItem('refreshToken', data.refreshToken);
         // --- Block legacy login for migrated users ---
         if (data.auth_email) {
           setShowMigration(false);
           setLegacyUserId(null);
-          setError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
+          setError('이미 지갑이 마이그레이션되었습니다. 구글로 로그인해주세요.');
           setIsLoading(false);
           return;
         }
@@ -55,11 +203,26 @@ export default function Home() {
         setIsLoading(false);
         return;
       } else {
-        setError(data.error || '잘못된 사용자 ID 또는 비밀번호');
+        // Handle CAPTCHA-specific errors
+        if (data.code === 'CAPTCHA_REQUIRED' || data.code === 'CAPTCHA_INVALID') {
+          setCaptchaError(data.error || 'CAPTCHA 인증에 실패했습니다');
+        } else {
+          setError(data.error || '잘못된 사용자 ID 또는 비밀번호입니다');
+        }
+        // Reset reCAPTCHA on error
+        setRecaptchaV2Token(null);
+        recaptchaV2Ref.current?.reset();
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(err instanceof Error ? err.message : '인증 실패');
+      if (err instanceof Error && err.message.includes('CAPTCHA')) {
+        setCaptchaError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : '인증에 실패했습니다');
+      }
+      // Reset reCAPTCHA on error
+      setRecaptchaV2Token(null);
+      recaptchaV2Ref.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -67,53 +230,331 @@ export default function Home() {
 
   // Defensive: Hide migration modal if error is set
   useEffect(() => {
-    if (error) {
+    if (error || captchaError) {
       setShowMigration(false);
       setLegacyUserId(null);
+      // Reset reCAPTCHA on any error
+      setRecaptchaV2Token(null);
+      recaptchaV2Ref.current?.reset();
     }
-  }, [error]);
+  }, [error, captchaError]);
 
-  // Google sign-in handler (moved to function)
+  // Google OAuth handler with complete landing page security implementation
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setError(null);
+    setShowGoogleModal(false);  // Close modal when starting sign-in
+    
+    console.log('🚀 Google login clicked - MZS Wallet enhanced auth');
+
     try {
+      console.log('🔄 Calling connect()...');
+      
       await connect();
-      let email = null;
-      if (getUserInfo) {
-        const userInfo = await getUserInfo();
-        email = userInfo?.email;
-      }
-      if (email) {
-        const res = await fetch('/api/user-wallet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+      console.log('✅ Connect completed');
+      
+      // Get user info - same for both mobile and web
+      console.log('🔄 Getting user info...');
+      const userInfo = await getUserInfo();
+      
+      console.log('🔍 CRITICAL DEBUG - User info received:', {
+        hasUserInfo: !!userInfo,
+        userInfoKeys: userInfo ? Object.keys(userInfo) : [],
+        email: userInfo?.email,
+        name: userInfo?.name,
+        hasEmail: !!(userInfo?.email)
+      });
+      
+      // Check if userInfo is valid
+      if (!userInfo || !userInfo.email) {
+        console.error('❌ CRITICAL ERROR - Invalid user info:', {
+          userInfoExists: !!userInfo,
+          userInfoValue: userInfo,
+          hasEmail: !!(userInfo?.email),
+          emailValue: userInfo?.email
         });
-        const data = await res.json();
-        if (res.ok && data.private_key) {
-          sessionStorage.setItem('walletPrivateKey', String(data.private_key));
-          router.push('/dashboard');
-          return;
-        }
+        throw new Error(`Authentication failed: No user information received. UserInfo: ${JSON.stringify(userInfo)}`);
       }
-      if (web3auth && web3auth.provider) {
-        const privateKey = await web3auth.provider.request({ method: 'eth_private_key' });
-        if (privateKey) {
-          sessionStorage.setItem('walletPrivateKey', String(privateKey));
-          router.push('/dashboard');
+      
+      const email = userInfo.email;
+      
+      // Get the Web3Auth ID token for secure authentication
+      console.log('🔄 Getting Web3Auth ID token...');
+      let idToken = null;
+      try {
+        // Get ID token from Web3Auth using the proper method
+        idToken = await getIdToken();
+        if (idToken) {
+          console.log('✅ Got Web3Auth ID token:', {
+            tokenLength: idToken.length,
+            tokenStart: idToken.substring(0, 50) + '...',
+            hasIdToken: !!idToken
+          });
         } else {
-          setError('Web3Auth에서 개인키를 가져오는데 실패했습니다.');
+          console.error('❌ getIdToken() returned null/undefined');
+        }
+      } catch (idTokenError) {
+        console.error('⚠️ Could not get Web3Auth ID token:', idTokenError);
+        console.error('🔍 ID Token error details:', {
+          message: idTokenError instanceof Error ? idTokenError.message : idTokenError,
+          stack: idTokenError instanceof Error ? idTokenError.stack : null
+        });
+        // Continue without ID token for now - we'll implement fallback
+      }
+      
+      // FORCE CLEAN SESSION - Clear all old tokens for pure Web3Auth security
+      sessionStorage.clear();
+      localStorage.removeItem('secure_session_token');
+      localStorage.removeItem('secure_user_data');
+      localStorage.removeItem('userInfo');
+      console.log('🧹 Cleared all old sessions - forcing pure Web3Auth authentication');
+      
+      // Generate device fingerprint for security binding
+      const deviceFingerprint = FrontendSecurity.generateDeviceFingerprint();
+      
+      // First, authenticate with OAuth to get session tokens
+      console.log('🔐 Authenticating OAuth user for:', email);
+      console.log('📋 UserInfo details:', {
+        email: userInfo.email,
+        name: userInfo.name,
+        verifierId: userInfo.verifierId,
+        typeOfLogin: userInfo.typeOfLogin,
+        aggregateVerifier: userInfo.aggregateVerifier
+      });
+      console.log('🔐 Device fingerprint generated for security binding');
+      
+      // CRITICAL: Track token length before JSON.stringify to detect truncation source
+      const requestPayload = {
+        email,
+        userInfo,
+        idToken: idToken, // Send the actual Web3Auth ID token
+        deviceFingerprint: deviceFingerprint // Bind token to this device
+      };
+      
+      console.log('🔍 TRUNCATION DEBUG - Before JSON.stringify:', {
+        idTokenLength: idToken?.length || 0,
+        isExactly1000: idToken?.length === 1000,
+        idTokenPreview: idToken?.substring(0, 100) + '...',
+        payloadObjectKeys: Object.keys(requestPayload)
+      });
+      
+      const jsonPayload = JSON.stringify(requestPayload);
+      console.log('🔍 TRUNCATION DEBUG - After JSON.stringify:', {
+        jsonLength: jsonPayload.length,
+        jsonPreview: jsonPayload.substring(0, 200) + '...',
+        jsonEnd: jsonPayload.substring(jsonPayload.length - 200)
+      });
+      
+      // Parse it back to check if idToken was truncated during JSON.stringify
+      const reparsed = JSON.parse(jsonPayload);
+      console.log('🔍 TRUNCATION DEBUG - After re-parsing JSON:', {
+        reparsedIdTokenLength: reparsed.idToken?.length || 0,
+        tokenPreserved: reparsed.idToken === idToken,
+        lengthChanged: (reparsed.idToken?.length || 0) !== (idToken?.length || 0)
+      });
+      
+      if (reparsed.idToken !== idToken) {
+        console.error('🚨 CRITICAL: Token was modified during JSON.stringify/parse cycle!');
+        console.error('🔍 Original vs Parsed:', {
+          original: idToken?.substring(0, 100) + '...',
+          parsed: reparsed.idToken?.substring(0, 100) + '...',
+          lengthDiff: (idToken?.length || 0) - (reparsed.idToken?.length || 0)
+        });
+      }
+      
+      const authRes = await fetch(`/api/${process.env.NEXT_PUBLIC_API_AUTH_OAUTH}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-Fingerprint': deviceFingerprint,
+          'X-Timestamp': Date.now().toString()
+        },
+        body: jsonPayload
+      });
+      
+      console.log('🔍 OAuth response status:', authRes.status);
+      
+      if (!authRes.ok) {
+        const errorText = await authRes.text();
+        console.error('❌ OAuth authentication failed:', {
+          status: authRes.status,
+          statusText: authRes.statusText,
+          error: errorText
+        });
+        throw new Error(`OAuth authentication failed: ${authRes.status} ${errorText}`);
+      }
+      
+      const authData = await authRes.json();
+      
+      // Store Web3Auth authentication tokens
+      if (authData.accessToken) {
+        sessionStorage.setItem('accessToken', authData.accessToken);
+        sessionStorage.setItem('refreshToken', authData.refreshToken);
+        // Store user email for dashboard use (will be auth_email from Firebase if exists)
+        sessionStorage.setItem('userEmail', authData.email);
+        // Store Web3Auth metadata for proper authentication
+        sessionStorage.setItem('authMethod', 'web3auth');
+        sessionStorage.setItem('web3AuthProvider', userInfo.typeOfLogin || 'google');
+        
+        console.log(`✅ Web3Auth authentication stored for: ${authData.email} (${userInfo.typeOfLogin})`);
+      } else {
+        console.error('❌ No accessToken received from OAuth endpoint!');
+        console.error('OAuth response data:', authData);
+      }
+      
+      // 🔐 ALWAYS FETCH EXISTING WALLET FROM FIRESTORE (NO NEW WALLET GENERATION)
+      console.log('🔄 Fetching existing wallet from Firestore');
+      
+      let privateKey;
+      
+      console.log('🔐 Checking for existing wallet with Web3Auth token...');
+      // Use direct wallet access with Web3Auth JWT token
+      const walletRes = await fetch(`/api/${process.env.NEXT_PUBLIC_API_USER_WALLET}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authData.accessToken}`,
+          'X-Device-Fingerprint': deviceFingerprint,
+          'X-Timestamp': Date.now().toString()
+        },
+        body: JSON.stringify({
+          email: email
+        })
+      });
+      
+      if (!walletRes.ok) {
+        const errorText = await walletRes.text();
+        
+        // Check if this is a "user not found" error
+        if (walletRes.status === 404 || errorText.includes('user not found') || errorText.includes('MZS Wallet user not found')) {
+          console.log('🧹 User not found in Firebase - clearing Web3Auth session to allow different email');
+          
+          // Clear Web3Auth session completely
+          try {
+            if (web3auth && web3auth.connected) {
+              await web3auth.logout();
+              console.log('✅ Web3Auth session cleared - user can try different email');
+            }
+            
+            // Clear browser storage
+            localStorage.removeItem('Web3Auth-cachedAdapter');
+            sessionStorage.clear();
+            localStorage.removeItem('userInfo');
+            
+            // Clear any auth data
+            sessionStorage.removeItem('accessToken');
+            sessionStorage.removeItem('refreshToken');
+            
+          } catch (clearError) {
+            console.warn('⚠️ Session clear warning:', clearError);
+          }
+          
+          throw new Error(`This email is not registered in MZS Wallet. Please use a different email or contact support.`);
+        }
+        
+        throw new Error(`Wallet access failed: ${walletRes.status} ${errorText}`);
+      }
+      
+      let data = await walletRes.json();
+      console.log('🔍 Secure wallet response:', { 
+        hasPrivateKey: !!(data.private_key || data.encryptedPrivateKey), 
+        isEncrypted: !!data.encryptedPrivateKey,
+        error: data.error 
+      });
+      
+      if (data && (data.private_key || data.encryptedPrivateKey)) {
+        // ✅ Use existing wallet from Firestore
+        console.log('✅ Using existing wallet from Firestore with enhanced security');
+        privateKey = data.encryptedPrivateKey || data.private_key;
+        
+        // Store secure session token if available
+        if (data.sessionToken) {
+          console.log('🔐 Storing secure session token from wallet API');
+          sessionStorage.setItem('secure_session_token', data.sessionToken);
+          sessionStorage.setItem('session_data', JSON.stringify(data.sessionData));
+        }
+      } else if (data && data.error === 'MZS Wallet user not found') {
+        // 🌐 WEB: Only web can create new wallets with Web3Auth
+        console.log('🌐 WEB: Creating new wallet with Web3Auth');
+        if (!web3auth?.provider) throw new Error('Web3Auth provider not initialized');
+        let privKey;
+        if (web3auth.provider.request) {
+          privKey = await web3auth.provider.request({ method: 'eth_private_key' });
+        }
+        if (!privKey) throw new Error('Could not get private key from Web3Auth');
+        // 🔐 Save to backend with Web3Auth JWT token
+        console.log('🔐 Creating wallet with Web3Auth authentication...');
+        const createWalletRes = await fetch(`/api/${process.env.NEXT_PUBLIC_API_USER_WALLET}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authData.accessToken}`,
+            'X-Device-Fingerprint': deviceFingerprint,
+            'X-Timestamp': Date.now().toString()
+          },
+          body: JSON.stringify({
+            email: email,
+            private_key: privKey
+          })
+        });
+        
+        if (!createWalletRes.ok) {
+          const errorText = await createWalletRes.text();
+          throw new Error(`Wallet creation failed: ${createWalletRes.status} ${errorText}`);
+        }
+        
+        data = await createWalletRes.json();
+        console.log('✅ Wallet created securely with encryption');
+        
+        privateKey = data.encryptedPrivateKey || privKey;
+        
+        // Store secure session token if available for new wallet
+        if (data.sessionToken) {
+          console.log('🔐 Storing secure session token from new wallet creation');
+          sessionStorage.setItem('secure_session_token', data.sessionToken);
+          sessionStorage.setItem('session_data', JSON.stringify(data.sessionData));
         }
       } else {
-        setError('Web3Auth 공급자가 초기화되지 않았습니다.');
+        console.error('❌ Backend error:', data.error);
+        throw new Error(data.error || 'Failed to fetch wallet from Firestore');
       }
+      sessionStorage.setItem('walletPrivateKey', privateKey);
+      if (data.user_id) {
+        sessionStorage.setItem('userId', data.user_id);
+      }
+      // Don't store solana_address - let it be derived from private key
+      localStorage.setItem('userInfo', JSON.stringify(userInfo));
+      setRedirecting(true);
+      router.push('/dashboard');
     } catch (err) {
-      setError('Google 로그인 실패');
-    } finally {
-      setIsLoading(false);
-      setShowGoogleModal(false);
-      setAgreeNewUser(false);
+      console.error('❌ Authentication failed:', err);
+      console.error('❌ Error details:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : null,
+        name: err instanceof Error ? err.name : null
+      });
+      
+      const errorMessage = err instanceof Error ? err.message : 'Failed to login with Google';
+      
+      // Try to close any stuck authentication popups
+      try {
+        closeAuthPopup();
+        console.log('✅ Closed authentication popup after error');
+      } catch (popupError) {
+        console.log('⚠️ Popup close warning after error:', popupError);
+      }
+      
+      // Check if this might be a timeout or authentication completion issue
+      if (isMobile && (errorMessage.includes('timeout') || errorMessage.includes('Authentication timed out'))) {
+        setError('인증이 완료되었을 수 있습니다. 앱을 확인하거나 다시 시도해주세요.');
+      } else {
+        setError(`인증 오류: ${errorMessage}`);
+      }
+      
+      // Add a small delay to prevent immediate redirects
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
     }
   };
 
@@ -185,8 +626,46 @@ export default function Home() {
             required
             style={{ marginBottom: 10 }}
           />
-          {error && <div style={{ color: 'var(--golf-green)', marginBottom: 8, fontWeight: 600 }}>{error}</div>}
-          <button type="submit" className="btn" style={{ fontSize: '1.15em', marginBottom: 8 }} disabled={isLoading}>
+          
+          {/* reCAPTCHA v2 Widget */}
+          <div className="flex justify-center mb-4">
+            <ReCAPTCHA
+              ref={recaptchaV2Ref}
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || "6LePdAYsAAAAAEQQKplJh0SDkOIod-cPh-GiUENu"}
+              onChange={(token) => {
+                console.log('[CAPTCHA] Token received from Google:', token ? `Token length: ${token.length}` : 'null');
+                setRecaptchaV2Token(token);
+                setCaptchaError(null);
+              }}
+              onExpired={() => {
+                console.log('[CAPTCHA] Token expired');
+                setRecaptchaV2Token(null);
+                setCaptchaError('reCAPTCHA가 만료되었습니다. 다시 확인해주세요.');
+              }}
+              onErrored={() => {
+                console.error('[CAPTCHA] Error occurred');
+                setRecaptchaV2Token(null);
+                setCaptchaError('reCAPTCHA 로딩 실패. 네트워크를 확인하거나 페이지를 새로고침해주세요.');
+              }}
+              onLoad={() => {
+                console.log('[CAPTCHA] reCAPTCHA loaded successfully');
+              }}
+              theme="light"
+              size="normal"
+            />
+          </div>
+          
+          {(error || captchaError) && (
+            <div className={`rounded-lg px-4 py-3 mb-2 text-center font-semibold shadow transition-all duration-200
+              ${(error?.includes('successfully'))
+                ? 'bg-green-100/80 text-green-700 border-l-4 border-green-500'
+                : 'bg-red-100/80 text-red-700 border-l-4 border-red-500'}
+            `}>
+              <p>{captchaError || error}</p>
+            </div>
+          )}
+          
+          <button type="submit" className="btn" style={{ fontSize: '1.15em', marginBottom: 8 }} disabled={isLoading || !recaptchaV2Token}>
             {isLoading ? '로그인 중...' : '로그인'}
           </button>
         </form>
@@ -345,14 +824,29 @@ export default function Home() {
               email = userInfo?.email;
             }
             if (email) {
-              const res = await fetch('/api/user-wallet', {
+              // Use enhanced wallet endpoint for migration success
+              const deviceFingerprint = FrontendSecurity.generateDeviceFingerprint();
+              const captchaToken = await executeRecaptcha('migration_complete');
+              
+              const res = await fetch('/api/user-wallet2025', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ 
+                  email,
+                  deviceFingerprint,
+                  captchaToken: captchaToken || 'migration-flow'
+                }),
               });
+              
               const data = await res.json();
               if (res.ok && data.private_key) {
                 sessionStorage.setItem('walletPrivateKey', String(data.private_key));
+                
+                // Store secure session if available
+                if (data.sessionToken) {
+                  sessionStorage.setItem('secure_session_token', data.sessionToken);
+                  sessionStorage.setItem('session_data', JSON.stringify(data.sessionData));
+                }
               }
             }
             router.push('/dashboard');

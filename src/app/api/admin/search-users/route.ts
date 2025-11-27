@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { verifyAdminToken } from '@/lib/adminAuth';
+import { verifyAdminSession } from '@/lib/adminAuth';
+import { logger } from '@/lib/logger';
 
 if (!getApps().length) {
   initializeApp({
@@ -15,159 +16,133 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
-  const startTime = Date.now();
-  
   // Verify admin authentication
-  const authResult = await verifyAdminToken(request);
+  const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
-    return NextResponse.json({ error: authResult.error }, { status: 401 });
+    logger.warn('🚨 Unauthorized admin search-users access attempt', {
+      error: authResult.error,
+      ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
+    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
   }
 
   try {
-    const { query, field } = await request.json();
-    
-    if (!query) {
-      return NextResponse.json({ error: 'Search query is required' }, { status: 400 });
+    const { searchTerm, searchFields, limit = 50 } = await request.json();
+
+    if (!searchTerm) {
+      return NextResponse.json({ error: 'Search term is required' }, { status: 400 });
     }
 
-    console.log(`Search request: query="${query}", field="${field}"`);
+    logger.log(`Admin search: "${searchTerm}" in fields: ${searchFields?.join(', ') || 'all'}`);
 
+    // Default searchable fields
+    const defaultFields = [
+      'user_id', 
+      'auth_email', 
+      'address', 
+      'email',
+      'created_at',
+      'migratedAt'
+    ];
+
+    const fieldsToSearch = searchFields || defaultFields;
     const results: any[] = [];
-    const collection = db.collection('mzs');
+    const searchedQueries: string[] = [];
 
-    const searchLower = query.toLowerCase();
-    
-    if (field && field !== '') {
-      // Search specific field using Firestore queries for better performance
+    // Search exact matches for each field
+    for (const field of fieldsToSearch) {
       try {
-        // Try exact match first
-        const exactQuery = collection.where(field, '==', query).limit(10);
-        const exactSnapshot = await exactQuery.get();
+        const query = db.collection('users')
+          .where(field, '==', searchTerm)
+          .limit(limit);
         
-        exactSnapshot.docs.forEach(doc => {
-          results.push({
-            documentId: doc.id,
-            matchField: field,
-            matchType: 'exact',
-            ...doc.data()
-          });
-        });
+        const snapshot = await query.get();
+        searchedQueries.push(`${field} == "${searchTerm}"`);
 
-        // If we have less than 10 results, try partial match
-        if (results.length < 10) {
-          const partialQuery = collection
-            .where(field, '>=', query)
-            .where(field, '<=', query + '\uf8ff')
-            .limit(20 - results.length);
-          
-          const partialSnapshot = await partialQuery.get();
-          
-          partialSnapshot.docs.forEach(doc => {
-            // Avoid duplicates
-            if (!results.find(r => r.documentId === doc.id)) {
-              results.push({
-                documentId: doc.id,
-                matchField: field,
-                matchType: 'partial',
-                ...doc.data()
-              });
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Field search error:', error);
-        // Fallback to a simple approach
-        const snapshot = await collection.limit(1000).get();
         snapshot.docs.forEach(doc => {
           const data = doc.data();
-          const fieldValue = data[field];
-          if (fieldValue && String(fieldValue).toLowerCase().includes(searchLower)) {
-            results.push({
-              documentId: doc.id,
-              matchField: field,
-              matchType: fieldValue === query ? 'exact' : 'partial',
-              ...data
-            });
+          // Remove sensitive fields for display
+          const sanitizedData = { ...data };
+          delete sanitizedData.private_key;
+          delete sanitizedData.password_hash;
+          
+          // Add match info
+          const result = {
+            docId: doc.id,
+            matchedField: field,
+            matchedValue: searchTerm,
+            ...sanitizedData
+          };
+          
+          // Avoid duplicates
+          if (!results.find(r => r.docId === doc.id)) {
+            results.push(result);
           }
         });
-      }
-    } else {
-      // Search all fields - use targeted queries for better performance
-      const searchFields = ['user_id', 'auth_email', 'address'];
+             } catch (error: any) {
+         logger.log(`Search failed for field ${field}:`, error?.message || error);
+         // Continue with other fields
+       }
+    }
+
+    // If no exact matches, try partial/fuzzy matching on text fields
+    if (results.length === 0) {
+      const textFields = ['user_id', 'auth_email', 'address'];
       
-      for (const searchField of searchFields) {
+      for (const field of textFields) {
         try {
-          // Exact match
-          const exactQuery = collection.where(searchField, '==', query).limit(5);
-          const exactSnapshot = await exactQuery.get();
+          // Get all documents and filter client-side for partial matches
+          const allDocsQuery = db.collection('users').limit(1000);
+          const snapshot = await allDocsQuery.get();
           
-          exactSnapshot.docs.forEach(doc => {
-            if (!results.find(r => r.documentId === doc.id)) {
-              results.push({
-                documentId: doc.id,
-                matchField: searchField,
-                matchType: 'exact',
-                ...doc.data()
-              });
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const fieldValue = data[field];
+            
+            if (fieldValue && typeof fieldValue === 'string') {
+              const isPartialMatch = fieldValue.toLowerCase().includes(searchTerm.toLowerCase());
+              
+              if (isPartialMatch) {
+                const sanitizedData = { ...data };
+                delete sanitizedData.private_key;
+                delete sanitizedData.password_hash;
+                
+                const result = {
+                  docId: doc.id,
+                  matchedField: field,
+                  matchedValue: fieldValue,
+                  matchType: 'partial',
+                  ...sanitizedData
+                };
+                
+                if (!results.find(r => r.docId === doc.id)) {
+                  results.push(result);
+                }
+              }
             }
           });
-
-          // Partial match (only if we don't have too many results yet)
-          if (results.length < 15) {
-            const partialQuery = collection
-              .where(searchField, '>=', query)
-              .where(searchField, '<=', query + '\uf8ff')
-              .limit(5);
-            
-            const partialSnapshot = await partialQuery.get();
-            
-            partialSnapshot.docs.forEach(doc => {
-              if (!results.find(r => r.documentId === doc.id)) {
-                results.push({
-                  documentId: doc.id,
-                  matchField: searchField,
-                  matchType: 'partial',
-                  ...doc.data()
-                });
-              }
-            });
-          }
-        } catch (error) {
-          console.warn(`Search failed for field ${searchField}:`, error);
-          // Continue with other fields
-        }
-        
-        // Stop if we have enough results
-        if (results.length >= 20) break;
+          
+          searchedQueries.push(`${field} contains "${searchTerm}" (partial)`);
+                 } catch (error: any) {
+           logger.log(`Partial search failed for field ${field}:`, error?.message || error);
+         }
       }
     }
 
-    // Sort results: exact matches first, then by match field
-    results.sort((a, b) => {
-      if (a.matchType === 'exact' && b.matchType !== 'exact') return -1;
-      if (a.matchType !== 'exact' && b.matchType === 'exact') return 1;
-      return a.matchField.localeCompare(b.matchField);
-    });
-
-    // Sort results: exact matches first, then by match field
-    results.sort((a, b) => {
-      if (a.matchType === 'exact' && b.matchType !== 'exact') return -1;
-      if (a.matchType !== 'exact' && b.matchType === 'exact') return 1;
-      return a.matchField.localeCompare(b.matchField);
-    });
-
-    const endTime = Date.now();
-    console.log(`Search completed in ${endTime - startTime}ms, found ${results.length} results`);
-
-    return NextResponse.json({ 
-      results: results.slice(0, 30), // Limit to 30 results
+    return NextResponse.json({
+      searchTerm,
+      results: results.slice(0, limit),
       totalFound: results.length,
-      searchTime: endTime - startTime
+      searchedQueries,
+      timestamp: new Date().toISOString(),
+      adminEmail: authResult.email
     });
 
   } catch (error) {
-    console.error('Error searching users:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Search error:', error);
+    return NextResponse.json({ error: 'Search failed' }, { status: 500 });
   }
 } 

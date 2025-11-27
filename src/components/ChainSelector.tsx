@@ -11,7 +11,7 @@ interface ChainSelectorProps {
 const ChainSelector: React.FC<ChainSelectorProps> = ({ selectedChain, onChainChange }) => {
   const chains = [
     { id: 'polygon' as Chain, name: 'Polygon', icon: '/matic-logo.png', color: '#8247E5' },
-    { id: 'tron' as Chain, name: 'Tron', icon: '/tron-logo.svg', color: '#FF0013' },
+    // { id: 'tron' as Chain, name: 'Tron', icon: '/tron-logo.svg', color: '#FF0013' }, // Commented out Tron wallet
   ];
 
   return (
