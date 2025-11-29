@@ -106,6 +106,12 @@ export class AdminSessionManager {
       }
 
       // Find session in Firestore
+      logger.log('🔍 Looking for admin session', {
+        adminId: tokenPayload.userId,
+        email: tokenPayload.email,
+        deviceFingerprint: tokenPayload.deviceFingerprint
+      });
+      
       const sessionsQuery = await db
         .collection('admin_sessions')
         .where('adminId', '==', tokenPayload.userId)
@@ -114,16 +120,54 @@ export class AdminSessionManager {
         .get();
 
       if (sessionsQuery.empty) {
-        logger.warn('Admin session not found in database', { userId: tokenPayload.userId });
+        logger.warn('Admin session not found in database', { 
+          userId: tokenPayload.userId,
+          email: tokenPayload.email
+        });
+        
+        // Debug: List all admin sessions
+        const allSessions = await db.collection('admin_sessions').limit(5).get();
+        logger.log('Debug - Available admin sessions:', 
+          allSessions.docs.map(d => ({ 
+            id: d.id, 
+            adminId: d.data().adminId,
+            email: d.data().email 
+          }))
+        );
+        
         return null;
       }
 
       const sessionDoc = sessionsQuery.docs[0];
-      const sessionData = sessionDoc.data() as AdminSessionData;
+      const rawData = sessionDoc.data();
+      
+      // Convert Firestore timestamps to Date objects
+      const sessionData: AdminSessionData = {
+        ...rawData,
+        createdAt: rawData.createdAt?.toDate ? rawData.createdAt.toDate() : new Date(rawData.createdAt),
+        expiresAt: rawData.expiresAt?.toDate ? rawData.expiresAt.toDate() : new Date(rawData.expiresAt),
+        lastActivity: rawData.lastActivity?.toDate ? rawData.lastActivity.toDate() : new Date(rawData.lastActivity)
+      } as AdminSessionData;
 
+      // Debug session data
+      logger.log('📅 Session time check', {
+        adminId: sessionData.adminId,
+        createdAt: sessionData.createdAt,
+        expiresAt: sessionData.expiresAt,
+        now: new Date(),
+        isExpired: new Date() > sessionData.expiresAt,
+        rawExpiresAt: rawData.expiresAt,
+        rawExpiresAtType: typeof rawData.expiresAt
+      });
+      
       // Check if session is expired
       if (new Date() > sessionData.expiresAt) {
-        logger.warn('Admin session expired', { adminId: sessionData.adminId });
+        logger.warn('Admin session expired', { 
+          adminId: sessionData.adminId,
+          expiresAt: sessionData.expiresAt,
+          now: new Date(),
+          timeDiff: new Date().getTime() - sessionData.expiresAt.getTime()
+        });
         await this.destroyAdminSession(sessionToken);
         return null;
       }
