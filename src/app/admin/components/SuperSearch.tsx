@@ -5,9 +5,9 @@ import { FaSearch, FaUser, FaSpinner, FaTimes } from 'react-icons/fa';
 import { adminApi, AdminApiError } from '@/lib/adminApi';
 
 interface SearchResult {
-  documentId: string;
-  matchField: string;
-  matchType: 'exact' | 'partial';
+  docId: string;
+  matchedField: string;
+  matchType?: 'exact' | 'partial';
   user_id?: string;
   auth_email?: string;
   address?: string;
@@ -174,7 +174,7 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
               </div>
               {results.map((user) => (
                 <button
-                  key={user.documentId}
+                  key={user.docId}
                   onClick={() => handleUserSelect(user)}
                   className="w-full text-left p-3 rounded-lg hover:bg-[var(--golf-gold)]/10 transition-colors border border-transparent hover:border-[var(--golf-gold)]/20"
                 >

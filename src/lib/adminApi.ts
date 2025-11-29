@@ -96,21 +96,21 @@ export const adminApi = {
     }),
 
   // Get user details
-  getUserDetails: (documentId: string) =>
-    adminRequest(`/api/admin/user-management?documentId=${documentId}`),
+  getUserDetails: (docId: string) =>
+    adminRequest(`/api/admin/user-management?docId=${docId}`),
 
   // Update user
-  updateUser: (documentId: string, updates: Record<string, any>, adminNote?: string) =>
+  updateUser: (docId: string, updates: Record<string, any>, adminAction?: string) =>
     adminRequest('/api/admin/user-management', {
       method: 'PUT',
-      body: JSON.stringify({ documentId, updates, adminNote }),
+      body: JSON.stringify({ docId, updates, adminAction }),
     }),
 
   // Delete user or fields
-  deleteUser: (documentId: string, fieldsToDelete?: string[], confirmationCode?: string) =>
+  deleteUser: (docId: string, fieldsToDelete?: string[], deleteEntireDoc?: boolean, confirmationCode?: string) =>
     adminRequest('/api/admin/user-management', {
       method: 'DELETE',
-      body: JSON.stringify({ documentId, fieldsToDelete, confirmationCode }),
+      body: JSON.stringify({ docId, fieldsToDelete, deleteEntireDoc, confirmationCode }),
     }),
 
   // Get analytics

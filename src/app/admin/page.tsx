@@ -18,9 +18,9 @@ interface PasswordResetRequest {
 }
 
 interface SearchResult {
-  documentId: string;
-  matchField: string;
-  matchType: 'exact' | 'partial';
+  docId: string;
+  matchedField: string;
+  matchType?: 'exact' | 'partial';
   user_id?: string;
   auth_email?: string;
   address?: string;

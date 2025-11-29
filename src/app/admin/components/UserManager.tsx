@@ -6,7 +6,8 @@ import { adminApi, AdminApiError } from '@/lib/adminApi';
 
 
 interface UserData {
-  documentId: string;
+  documentId?: string;
+  docId?: string;
   user_id?: string;
   auth_email?: string;
   address?: string;
@@ -92,7 +93,11 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
       }
 
       // Call the admin API to update the user
-      await adminApi.updateUser(user.documentId, updates, `Updated field: ${fieldKey}`);
+      const docId = user.docId || user.documentId;
+      if (!docId) {
+        throw new Error('Document ID is missing');
+      }
+      await adminApi.updateUser(docId, updates, `Updated field: ${fieldKey}`);
       
       setSuccess(`${field?.label || fieldKey} 필드가 성공적으로 업데이트되었습니다.`);
       onUserUpdated(); // Refresh the data
@@ -118,7 +123,11 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
 
     try {
       // Call the admin API to delete specific fields
-      await adminApi.deleteUser(user.documentId, fieldsToDelete, deleteConfirmCode);
+      const docId = user.docId || user.documentId;
+      if (!docId) {
+        throw new Error('Document ID is missing');
+      }
+      await adminApi.deleteUser(docId, fieldsToDelete, false, deleteConfirmCode);
       
       setSuccess(`${fieldsToDelete.length}개의 필드가 성공적으로 삭제되었습니다.`);
       setShowDeleteConfirm(false);
@@ -147,7 +156,11 @@ export default function UserManager({ user, onClose, onUserUpdated }: UserManage
 
     try {
       // Call the admin API to delete the entire user
-      await adminApi.deleteUser(user.documentId, undefined, deleteConfirmCode);
+      const docId = user.docId || user.documentId;
+      if (!docId) {
+        throw new Error('Document ID is missing');
+      }
+      await adminApi.deleteUser(docId, undefined, true, deleteConfirmCode);
       
       setSuccess('사용자가 성공적으로 삭제되었습니다.');
       setShowDeleteConfirm(false);
