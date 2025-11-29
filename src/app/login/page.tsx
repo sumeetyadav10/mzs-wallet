@@ -1,9 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useWeb3Auth } from "@/lib/web3auth/Web3AuthProvider";
 import MigrationModal from "@/components/MigrationModal";
 import { FcGoogle } from "react-icons/fc";
+import ReCAPTCHA from "react-google-recaptcha";
+import { SecureAPIClient } from "@/lib/security/frontend-security";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,40 +22,72 @@ export default function LoginPage() {
   const [oldUserError, setOldUserError] = useState<string | null>(null);
   const [oldUserLoading, setOldUserLoading] = useState(false);
   const [agreeNewUser, setAgreeNewUser] = useState(false);
+  const [recaptchaV2Token, setRecaptchaV2Token] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const recaptchaV2Ref = useRef<ReCAPTCHA>(null);
+  const [oldUserRecaptchaToken, setOldUserRecaptchaToken] = useState<string | null>(null);
+  const oldUserRecaptchaRef = useRef<ReCAPTCHA>(null);
 
   const handleLegacyLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setCaptchaError(null);
+    
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || '로그인 실패');
+      // Check if reCAPTCHA v2 is completed
+      if (!recaptchaV2Token) {
+        setCaptchaError('reCAPTCHA 확인을 완료해주세요.');
         setIsLoading(false);
         return;
       }
-      // Handle migration or dashboard redirect as before
-      if (data.auth_email) {
-        setShowMigration(false);
-        setLegacyUserId(null);
-        setError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
-        setIsLoading(false);
-        return;
+      
+      // Use secure authentication with reCAPTCHA
+      const data = await SecureAPIClient.authenticateSecure(email, password, recaptchaV2Token);
+      
+      if (data.accessToken && data.encryptedPrivateKey) {
+        // Store access token for authenticated API calls
+        sessionStorage.setItem('accessToken', data.accessToken);
+        sessionStorage.setItem('refreshToken', data.refreshToken);
+        
+        // Handle migration or dashboard redirect as before
+        if (data.auth_email) {
+          setShowMigration(false);
+          setLegacyUserId(null);
+          setError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (data.private_key && !data.auth_email) {
+          setLegacyUserId(data.user_id || email);
+          setShowMigration(true);
+          setIsLoading(false);
+          return;
+        }
+        
+        router.push("/dashboard");
+      } else {
+        // Handle CAPTCHA-specific errors
+        if (data.code === 'CAPTCHA_REQUIRED' || data.code === 'CAPTCHA_INVALID') {
+          setCaptchaError(data.error || 'CAPTCHA 인증에 실패했습니다');
+        } else {
+          setError(data.error || '잘못된 사용자 ID 또는 비밀번호입니다');
+        }
+        // Reset reCAPTCHA on error
+        setRecaptchaV2Token(null);
+        recaptchaV2Ref.current?.reset();
       }
-      if (data.private_key && !data.auth_email) {
-        setLegacyUserId(data.user_id);
-        setShowMigration(true);
-        setIsLoading(false);
-        return;
-      }
-      router.push("/dashboard");
     } catch (err) {
-      setError("로그인 실패");
+      console.error('Login error:', err);
+      if (err instanceof Error && err.message.includes('CAPTCHA')) {
+        setCaptchaError(err.message);
+      } else {
+        setError(err instanceof Error ? err.message : '인증에 실패했습니다');
+      }
+      // Reset reCAPTCHA on error
+      setRecaptchaV2Token(null);
+      recaptchaV2Ref.current?.reset();
     } finally {
       setIsLoading(false);
     }
@@ -102,36 +136,49 @@ export default function LoginPage() {
     e.preventDefault();
     setOldUserLoading(true);
     setOldUserError(null);
+    
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: oldUserEmail, password: oldUserPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
+      // Check if reCAPTCHA v2 is completed
+      if (!oldUserRecaptchaToken) {
+        setOldUserError('reCAPTCHA 확인을 완료해주세요.');
+        setOldUserLoading(false);
+        return;
+      }
+      
+      // Use secure authentication with reCAPTCHA
+      const data = await SecureAPIClient.authenticateSecure(oldUserEmail, oldUserPassword, oldUserRecaptchaToken);
+      
+      if (data.accessToken && data.encryptedPrivateKey) {
+        // Store access token for authenticated API calls
+        sessionStorage.setItem('accessToken', data.accessToken);
+        sessionStorage.setItem('refreshToken', data.refreshToken);
+        
+        // Handle migration or dashboard redirect as before
+        if (data.auth_email) {
+          setOldUserError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
+          setOldUserLoading(false);
+          return;
+        }
+        
+        if (data.private_key && !data.auth_email) {
+          setShowMigration(true);
+          setLegacyUserId(data.user_id || oldUserEmail);
+          setShowOldUserModal(false);
+          setOldUserLoading(false);
+          return;
+        }
+        
+        router.push("/dashboard");
+      } else {
         setOldUserError(data.error || '로그인 실패');
-        setOldUserLoading(false);
-        return;
       }
-      // Handle migration or dashboard redirect as before
-      if (data.auth_email) {
-        setOldUserError('지갑을 이미 마이그레이션했습니다. Google로 로그인해주세요.');
-        setOldUserLoading(false);
-        return;
-      }
-      if (data.private_key && !data.auth_email) {
-        setShowMigration(true);
-        setLegacyUserId(data.user_id);
-        setShowOldUserModal(false);
-        setOldUserLoading(false);
-        return;
-      }
-      router.push("/dashboard");
     } catch (err) {
-      setOldUserError("로그인 실패");
+      setOldUserError(err instanceof Error ? err.message : "로그인 실패");
     } finally {
       setOldUserLoading(false);
+      // Reset reCAPTCHA on completion
+      setOldUserRecaptchaToken(null);
+      oldUserRecaptchaRef.current?.reset();
     }
   };
 
@@ -223,12 +270,34 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* reCAPTCHA v2 */}
+            <div className="flex justify-center my-4">
+              <ReCAPTCHA
+                ref={recaptchaV2Ref}
+                sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+                onChange={(token) => setRecaptchaV2Token(token)}
+                onExpired={() => setRecaptchaV2Token(null)}
+                theme="light"
+              />
+            </div>
+
+            {/* Error messages */}
+            {captchaError && (
+              <div className="rounded-md bg-red-50 p-4 mb-4">
+                <p className="text-sm text-red-800">{captchaError}</p>
+              </div>
+            )}
+            {error && (
+              <div className="rounded-md bg-red-50 p-4 mb-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
+
             <div>
               <button
                 type="submit"
                 disabled={isLoading}
                 className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                onClick={() => console.log("Sign in button clicked")}
               >
                 {isLoading ? "로그인 중..." : "로그인"}
               </button>
@@ -261,6 +330,17 @@ export default function LoginPage() {
                 className="w-full border rounded px-3 py-2"
                 required
               />
+              {/* reCAPTCHA v2 for Old User Modal */}
+              <div className="flex justify-center my-4">
+                <ReCAPTCHA
+                  ref={oldUserRecaptchaRef}
+                  sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ""}
+                  onChange={(token) => setOldUserRecaptchaToken(token)}
+                  onExpired={() => setOldUserRecaptchaToken(null)}
+                  theme="light"
+                />
+              </div>
+              
               <div className="flex justify-between items-center">
                 <button
                   type="button"
