@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { securityManager } from '@/lib/security/session-manager';
 import { securityMiddleware } from '@/lib/security/security-middleware';
 import { logger } from '@/lib/logger';
-import { decryptPrivateKey, encryptPrivateKey, logSecurityEvent } from '@/lib/server-crypto';
+import { logSecurityEvent } from '@/lib/server-crypto';
 import { DeviceFP, ReqSign, CriticalRL, SecAuth, SecAudit, PKProtect } from '@/lib/security/enhanced-security';
 // Enhanced Web3Auth verification is handled through SecureSessionManager
 import { verifyJWTToken } from '@/lib/web3auth-jwt-secure';
@@ -245,15 +245,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Private key not found' }, { status: 404 });
     }
     
-    // 🔐 DECRYPT PRIVATE KEY FROM DATABASE (if encrypted)
+    // 🔐 GET RAW PRIVATE KEY FROM DATABASE (stored raw for wallet import)
     let rawPrivateKey: string;
-    try {
-      rawPrivateKey = decryptPrivateKey(userData.private_key, session.email);
-    } catch (error) {
-      // If decryption fails, it might be a raw key (legacy)
-      logger.warn(`⚠️ Found raw private key - security risk!`);
-      rawPrivateKey = userData.private_key;
-    }
+    rawPrivateKey = userData.private_key;
+    logger.log('✅ Using raw private key for wallet import');
     
     // 🔐 ENHANCED ENCRYPTION FOR TRANSPORT
     const transportEncryptedKey = PKProtect.encryptForTransport(

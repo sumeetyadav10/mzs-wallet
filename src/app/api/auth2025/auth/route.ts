@@ -147,15 +147,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.log('Querying user with SQL injection prevention:', user_id);
+    logger.log('Querying user from Firestore:', user_id);
     
-    // 🔒 SECURE DATABASE QUERY - Use SQL injection prevention
-    const userResult = await SQLInjectionPrevention.safeQuery(
-      'SELECT * FROM users WHERE user_id = $1',
-      [user_id]
-    );
-    if (!userResult) {
-      logger.log('User not found via secure query');
+    // 🔒 SECURE DATABASE QUERY - Validate input and query Firestore
+    // Sanitize user_id to prevent injection attempts
+    const sanitizedUserId = SQLInjectionPrevention.sanitizeInput(user_id, 'user_id');
+    
+    // Query user from Firestore
+    const userQuery = await db.collection('users').where('user_id', '==', sanitizedUserId).limit(1).get();
+    
+    if (userQuery.empty) {
+      logger.log('User not found in Firestore');
       
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
@@ -173,8 +175,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const userDoc = { id: userResult.id };
-    const userData = userResult.data;
+    const userDoc = userQuery.docs[0];
+    const userData = userDoc.data();
     
     logger.log('User data found:', { ...userData, password_hash: '[REDACTED]', private_key: '[REDACTED]' });
     
@@ -230,9 +232,11 @@ export async function POST(request: NextRequest) {
       // Keep backward compatibility
       sessionToken: tokens.accessToken, // Use access token for backward compatibility
       private_key: encryptedPrivateKey,
+      encryptedPrivateKey: encryptedPrivateKey, // Add this for login page compatibility
       auth_email: userData.auth_email || null,
       message: 'Login successful',
-      isAdmin: userData.role === 'admin' || userData.isAdmin === true
+      isAdmin: userData.role === 'admin' || userData.isAdmin === true,
+      user_id: userDoc.id // Add user_id for migration flow
     });
     
     // Add enhanced security headers

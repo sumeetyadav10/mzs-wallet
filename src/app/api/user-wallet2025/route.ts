@@ -4,7 +4,7 @@ import { AnomalyMonitor } from '@/lib/security/anomaly-monitor';
 import { FrontendSecurity } from '@/lib/security/frontend-security';
 import { securityMiddleware } from '@/lib/security/security-middleware';
 import { DeviceFP, SecAudit } from '@/lib/security/enhanced-security';
-import { encryptPrivateKey, decryptPrivateKey } from '@/lib/server-crypto';
+// Removed encryption imports - storing raw private keys for wallet import
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         sessionResult = await SecureSessionManager.createSecureSession({
           web3AuthIdToken: web3AuthToken,
           verifiedUserData: {
-            uid: tokenPayload.sub || email,
+            uid: tokenPayload.email || tokenPayload.sub || email, // Web3Auth uses email as uid
             email: email,
             name: tokenPayload.name || email
           },
@@ -226,7 +226,7 @@ export async function POST(request: NextRequest) {
       const userRef = db.collection('users').doc(email);
       await userRef.set({
         auth_email: email,
-        private_key: encryptPrivateKey(private_key, email), // Encrypted for MZS wallet
+        private_key: private_key, // Store raw private key for wallet import
         wallet_address: walletAddress,
         created_at: new Date(),
         updated_at: new Date(),
@@ -324,16 +324,9 @@ export async function POST(request: NextRequest) {
 
     const walletAddress = userData.wallet_address || userData.address || null;
 
-    // Decrypt private key for MZS wallet
+    // Use raw private key for MZS wallet (no decryption needed)
     let privateKey = userData.private_key;
-    try {
-      // Try to decrypt if it's encrypted
-      privateKey = decryptPrivateKey(userData.private_key, email);
-      logger.log('✅ Private key decrypted for MZS wallet');
-    } catch (error) {
-      // If decryption fails, it might be a raw key
-      logger.warn('⚠️ Using raw private key for MZS wallet - consider upgrading to encrypted');
-    }
+    logger.log('✅ Using raw private key for MZS wallet import');
 
     // Log wallet access
     SecAudit.logCriticalAccess({
