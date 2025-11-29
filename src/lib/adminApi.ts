@@ -7,20 +7,46 @@ export class AdminApiError extends Error {
   }
 }
 
+// Device fingerprinting function - same as AdminAuthContext
+const generateDeviceFingerprint = (): string => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx?.fillText('MZS Admin', 2, 2);
+  const canvasFingerprint = canvas.toDataURL();
+  
+  const fingerprint = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    new Date().getTimezoneOffset(),
+    canvasFingerprint.slice(0, 50)
+  ].join('|');
+  
+  return btoa(fingerprint).slice(0, 50);
+};
+
 export async function adminRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
-    // Get current user's auth token
-    const user = auth.currentUser;
-    if (!user) {
-      throw new AdminApiError('인증되지 않은 사용자입니다.', 401);
+    // First check for admin session token (from MFA auth)
+    const sessionToken = localStorage.getItem('admin_session_token');
+    
+    if (!sessionToken) {
+      // If no session token, check if user is authenticated with Firebase
+      const user = auth.currentUser;
+      if (!user) {
+        throw new AdminApiError('인증되지 않은 사용자입니다. 관리자 패널에 다시 로그인하세요.', 401);
+      }
+      throw new AdminApiError('관리자 세션이 만료되었습니다. MFA 인증을 다시 진행해주세요.', 401);
     }
 
-    const token = await user.getIdToken();
+    // Generate device fingerprint for every request
+    const deviceFingerprint = generateDeviceFingerprint();
     
-    // Prepare headers
+    // Prepare headers with session token and device fingerprint
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${sessionToken}`,
+      'x-device-fingerprint': deviceFingerprint,
       ...options.headers,
     };
 
@@ -33,6 +59,13 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
     // Handle response
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      
+      // If session is invalid, clear it and prompt re-login
+      if (response.status === 403 || response.status === 401) {
+        localStorage.removeItem('admin_session_token');
+        window.location.href = '/admin/login';
+      }
+      
       throw new AdminApiError(
         errorData.error || `HTTP ${response.status}: ${response.statusText}`,
         response.status
