@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@/store/WalletContext';
 import Navigation from '@/components/Navigation';
@@ -12,12 +12,7 @@ export default function Settings() {
   const router = useRouter();
   const { wallet, resetWallet } = useWallet();
   const { disconnect } = useWeb3Auth();
-  const [showExport, setShowExport] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const downloadRef = useRef<HTMLAnchorElement>(null);
 
   const handleLogout = async () => {
     try {
@@ -33,39 +28,6 @@ export default function Settings() {
     }
   };
 
-  const handleExportPrivateKey = () => {
-    if (wallet && 'privateKey' in wallet) {
-      setShowExport(true);
-      setExportError(null);
-    } else {
-      setExportError('지갑이 로드되지 않았습니다.');
-    }
-  };
-
-  const handleBackupWallet = () => {
-    if (wallet && 'privateKey' in wallet) {
-      const blob = new Blob([
-        `지갑 백업\n\n` +
-        `날짜: ${new Date().toLocaleString()}\n` +
-        `네트워크: Polygon 메인넷\n` +
-        `주소: ${wallet.address}\n` +
-        `개인키: ${wallet.privateKey}\n\n` +
-        `중요: 이 파일을 안전하게 보관하세요!\n` +
-        `개인키를 아는 사람은 누구나 귀하의 자산에 접근할 수 있습니다.\n` +
-        `개인키를 누구와도 공유하지 마세요.\n` +
-        `이 백업을 안전한 장소에 보관하세요.`
-      ], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      if (downloadRef.current) {
-        downloadRef.current.href = url;
-        downloadRef.current.download = `wallet-backup-${wallet.address}.txt`;
-        downloadRef.current.click();
-        setExportError(null);
-      }
-    } else {
-      setExportError('지갑이 로드되지 않았습니다.');
-    }
-  };
 
   const handleClearWallet = async () => {
     if (confirm('지갑을 삭제하시겠습니까? 이 기기에서만 제거되며 블록체인에서는 제거되지 않습니다.')) {
@@ -99,26 +61,9 @@ export default function Settings() {
         <div style={{ marginBottom: 32 }}>
           <h3 style={{ color: 'var(--golf-green)', fontWeight: 600, marginBottom: 12 }}>보안</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button onClick={handleExportPrivateKey} className="btn" style={{ background: 'var(--golf-gold)', color: 'var(--golf-dark)' }}>개인키 내보내기</button>
-            <button onClick={handleBackupWallet} className="btn" style={{ background: 'var(--golf-green)', color: 'var(--golf-white)' }}>월렛 백업</button>
             <button onClick={handleClearWallet} className="btn" style={{ background: 'red', color: 'var(--golf-white)' }}>기기에서 월렛 삭제</button>
           </div>
         </div>
-        {showExport && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="card" style={{ maxWidth: 400, background: 'var(--golf-white)', color: 'var(--golf-dark)' }}>
-              <h3 style={{ color: 'var(--golf-green)', fontWeight: 700, marginBottom: 12 }}>개인키 내보내기</h3>
-              <p style={{ fontSize: 14, color: 'var(--golf-gold)', marginBottom: 12 }}>경고: 절대 개인키를 공유하지 마세요. 개인키를 알면 누구나 자산에 접근할 수 있습니다.</p>
-              {wallet && 'privateKey' in wallet && (
-                <div style={{ background: 'var(--golf-accent)', borderRadius: 8, padding: '1em', marginBottom: 12, fontFamily: 'monospace', fontSize: 14 }}>{showPrivateKey ? wallet.privateKey : '••••••••••••••••••••••••••••••••'}</div>
-              )}
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button onClick={() => setShowPrivateKey(!showPrivateKey)} className="btn" style={{ background: 'var(--golf-green)', color: 'var(--golf-white)' }}>{showPrivateKey ? '개인키 숨기기' : '개인키 보기'}</button>
-                <button onClick={() => setShowExport(false)} className="btn" style={{ background: 'var(--golf-gold)', color: 'var(--golf-dark)' }}>닫기</button>
-              </div>
-            </div>
-          </div>
-        )}
         <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center', width: '100%' }}>
           <button
             className="btn"
@@ -129,7 +74,6 @@ export default function Settings() {
             {isLoading ? '로그아웃 중...' : '로그아웃'}
           </button>
         </div>
-        {exportError && <div style={{ color: 'red', marginTop: 12 }}>{exportError}</div>}
       </div>
       <BottomNav />
     </div>

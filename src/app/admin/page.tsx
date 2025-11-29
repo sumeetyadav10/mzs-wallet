@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FaGolfBall, FaRegCopy, FaExternalLinkAlt, FaUser, FaCheck, FaTimes, FaSearch, FaChartBar, FaSpinner } from 'react-icons/fa';
+import { FaGolfBall, FaRegCopy, FaExternalLinkAlt, FaUser, FaCheck, FaTimes, FaSearch, FaSpinner } from 'react-icons/fa';
 import SuperSearch from './components/SuperSearch';
 import UserManager from './components/UserManager';
 import { ethers } from 'ethers';
@@ -27,36 +27,6 @@ interface SearchResult {
   [key: string]: any;
 }
 
-interface Analytics {
-  overview: {
-    totalDocuments: number;
-    totalUniqueUsers: number;
-    duplicateDocuments: number;
-  };
-  userTypes: {
-    migratedUsers: number;
-    legacyUsers: number;
-    incompleteUsers: number;
-  };
-  fieldCompleteness: {
-    [key: string]: number | { [key: string]: number };
-    completenessPercentages: { [key: string]: number };
-  };
-  emailProviders: { [key: string]: number };
-  timeAnalysis: {
-    recentCreations30Days: number;
-    recentMigrations30Days: number;
-    totalWithCreationDate: number;
-    totalWithMigrationDate: number;
-  };
-  healthMetrics: {
-    duplicateUserIds: number;
-    usersWithoutId: number;
-    usersWithoutPrivateKey: number;
-    healthScore: number;
-  };
-  generatedAt: string;
-}
 
 const MZS_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
@@ -67,7 +37,7 @@ const MZS_ADDRESS = "0x1aDb749FFDA33251e1503672951b5A4234518Fa7";
 export default function AdminPanel() {
   const router = useRouter();
   const { user, isAdmin, loading: authLoading, sessionToken, logout } = useAdminAuth();
-  const [activeTab, setActiveTab] = useState<'recovery' | 'search' | 'analytics'>('recovery');
+  const [activeTab, setActiveTab] = useState<'recovery' | 'search'>('recovery');
   
   // Recovery requests state
   const [requests, setRequests] = useState<PasswordResetRequest[]>([]);
@@ -80,10 +50,6 @@ export default function AdminPanel() {
   // User management state
   const [selectedUser, setSelectedUser] = useState<SearchResult | null>(null);
   const [showUserManager, setShowUserManager] = useState(false);
-  
-  // Analytics state
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   
   // Common state
   const [loading, setLoading] = useState(false);
@@ -105,8 +71,6 @@ export default function AdminPanel() {
     if (!authLoading && user && isAdmin && sessionToken) {
       if (activeTab === 'recovery') {
         fetchRequests();
-      } else if (activeTab === 'analytics' && !analytics) {
-        fetchAnalytics();
       }
     }
   }, [activeTab, authLoading, user, isAdmin, sessionToken]);
@@ -232,23 +196,6 @@ export default function AdminPanel() {
     }
   };
 
-  const fetchAnalytics = async () => {
-    try {
-      setAnalyticsLoading(true);
-      setError(null);
-      const data = await adminApi.getAnalytics();
-      setAnalytics(data);
-    } catch (err) {
-      // Don't set error state for authentication errors to prevent infinite loops
-      if (err instanceof AdminApiError && err.message.includes('인증')) {
-        console.log('Authentication error in fetchAnalytics, not setting error state');
-        return;
-      }
-      setError(err instanceof AdminApiError ? err.message : '분석 데이터를 가져오는 중 오류가 발생했습니다.');
-    } finally {
-      setAnalyticsLoading(false);
-    }
-  };
 
   const handleApprove = async (requestId: string) => {
     if (!confirm('이 요청을 승인하시겠습니까?')) return;
@@ -278,8 +225,6 @@ export default function AdminPanel() {
     setRefreshing(true);
     if (activeTab === 'recovery') {
       await fetchRequests();
-    } else if (activeTab === 'analytics') {
-      await fetchAnalytics();
     }
     setRefreshing(false);
   };
@@ -291,9 +236,6 @@ export default function AdminPanel() {
 
   const handleUserUpdated = () => {
     // Refresh current tab data if needed
-    if (activeTab === 'analytics') {
-      fetchAnalytics();
-    }
   };
 
   // Show loading state while authentication is being checked or redirecting
@@ -380,17 +322,6 @@ export default function AdminPanel() {
             >
               <FaSearch />
               사용자 검색
-            </button>
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 ${
-                activeTab === 'analytics'
-                  ? 'bg-[var(--golf-gold)]/20 text-[var(--golf-green)] border border-[var(--golf-gold)]/30'
-                  : 'text-[var(--golf-dark)]/70 hover:bg-[var(--golf-gold)]/10'
-              }`}
-            >
-              <FaChartBar />
-              분석
             </button>
           </div>
         </div>
@@ -546,114 +477,6 @@ export default function AdminPanel() {
         {activeTab === 'search' && (
           <div>
             <SuperSearch onUserSelect={handleUserSelect} />
-          </div>
-        )}
-
-        {activeTab === 'analytics' && (
-          <div>
-            {analyticsLoading ? (
-              <div className="glass p-10 rounded-2xl text-center">
-                <FaSpinner className="animate-spin text-[var(--golf-gold)] mx-auto mb-4" size={32} />
-                <div className="text-[var(--golf-dark)] font-semibold">분석 데이터 생성 중...</div>
-              </div>
-            ) : analytics ? (
-              <div className="space-y-6">
-                {/* Overview */}
-                <div className="glass rounded-2xl border border-[var(--golf-gold)]/20 p-6">
-                  <h3 className="text-xl font-bold text-[var(--golf-green)] mb-4">개요</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="glass p-4 rounded-xl border border-[var(--golf-gold)]/20">
-                      <div className="text-2xl font-bold text-[var(--golf-gold)]">{analytics.overview.totalUniqueUsers.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">고유 사용자</div>
-                    </div>
-                    <div className="glass p-4 rounded-xl border border-[var(--golf-gold)]/20">
-                      <div className="text-2xl font-bold text-[var(--golf-gold)]">{analytics.overview.totalDocuments.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">전체 문서</div>
-                    </div>
-                    <div className="glass p-4 rounded-xl border border-[var(--golf-gold)]/20">
-                      <div className="text-2xl font-bold text-[var(--golf-gold)]">{analytics.overview.duplicateDocuments.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">중복 문서</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* User Types */}
-                <div className="glass rounded-2xl border border-[var(--golf-gold)]/20 p-6">
-                  <h3 className="text-xl font-bold text-[var(--golf-green)] mb-4">사용자 유형</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="glass p-4 rounded-xl border border-green-500/20">
-                      <div className="text-2xl font-bold text-green-600">{analytics.userTypes.migratedUsers.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">마이그레이션된 사용자</div>
-                    </div>
-                    <div className="glass p-4 rounded-xl border border-blue-500/20">
-                      <div className="text-2xl font-bold text-blue-600">{analytics.userTypes.legacyUsers.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">레거시 사용자</div>
-                    </div>
-                    <div className="glass p-4 rounded-xl border border-yellow-500/20">
-                      <div className="text-2xl font-bold text-yellow-600">{analytics.userTypes.incompleteUsers.toLocaleString()}</div>
-                      <div className="text-[var(--golf-dark)]/70">불완전한 사용자</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Health Score */}
-                <div className="glass rounded-2xl border border-[var(--golf-gold)]/20 p-6">
-                  <h3 className="text-xl font-bold text-[var(--golf-green)] mb-4">데이터베이스 건강도</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="text-4xl font-bold text-[var(--golf-gold)]">{analytics.healthMetrics.healthScore}%</div>
-                    <div className="flex-1">
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div 
-                          className="bg-gradient-to-r from-[var(--golf-gold)] to-[var(--golf-green)] h-4 rounded-full transition-all duration-500"
-                          style={{ width: `${analytics.healthMetrics.healthScore}%` }}
-                        ></div>
-                      </div>
-                      <div className="text-sm text-[var(--golf-dark)]/70 mt-2">
-                        완전한 사용자 데이터 비율
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email Providers */}
-                {Object.keys(analytics.emailProviders).length > 0 && (
-                  <div className="glass rounded-2xl border border-[var(--golf-gold)]/20 p-6">
-                    <h3 className="text-xl font-bold text-[var(--golf-green)] mb-4">이메일 제공업체</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {Object.entries(analytics.emailProviders).map(([provider, count]) => (
-                        <div key={provider} className="glass p-3 rounded-xl border border-[var(--golf-gold)]/20">
-                          <div className="text-lg font-bold text-[var(--golf-gold)]">{count}</div>
-                          <div className="text-[var(--golf-dark)]/70 text-sm">{provider}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Time Analysis */}
-                <div className="glass rounded-2xl border border-[var(--golf-gold)]/20 p-6">
-                  <h3 className="text-xl font-bold text-[var(--golf-green)] mb-4">시간 분석</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="glass p-4 rounded-xl border border-[var(--golf-gold)]/20">
-                      <div className="text-2xl font-bold text-[var(--golf-gold)]">{analytics.timeAnalysis.recentCreations30Days}</div>
-                      <div className="text-[var(--golf-dark)]/70">최근 30일 생성</div>
-                    </div>
-                    <div className="glass p-4 rounded-xl border border-[var(--golf-gold)]/20">
-                      <div className="text-2xl font-bold text-[var(--golf-gold)]">{analytics.timeAnalysis.recentMigrations30Days}</div>
-                      <div className="text-[var(--golf-dark)]/70">최근 30일 마이그레이션</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center text-sm text-[var(--golf-dark)]/60">
-                  분석 생성 시간: {new Date(analytics.generatedAt).toLocaleString('ko-KR')}
-                </div>
-              </div>
-            ) : (
-              <div className="glass p-10 rounded-2xl text-center text-[var(--golf-dark)] font-semibold">
-                분석 데이터를 불러올 수 없습니다.
-              </div>
-            )}
           </div>
         )}
 
