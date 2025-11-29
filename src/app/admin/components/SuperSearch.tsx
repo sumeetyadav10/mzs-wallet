@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { FaSearch, FaUser, FaSpinner, FaTimes } from 'react-icons/fa';
-import { useAdminAuth } from '@/lib/AdminAuthContext';
-
+import { adminApi, AdminApiError } from '@/lib/adminApi';
 
 interface SearchResult {
   documentId: string;
@@ -29,7 +28,6 @@ const SEARCH_FIELDS = [
 ];
 
 export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
-  const { user } = useAdminAuth();
   const [query, setQuery] = useState('');
   const [selectedField, setSelectedField] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -44,36 +42,11 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
       return;
     }
 
-    if (!user) {
-      setError('인증이 필요합니다.');
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const token = await user.getIdToken();
-      const response = await fetch('/api/admin/search-users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          query: searchQuery,
-          field: searchField || undefined // Send undefined for all fields
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('인증이 필요합니다.');
-        }
-        throw new Error('검색 요청이 실패했습니다.');
-      }
-
-      const data = await response.json();
+      const data = await adminApi.searchUsers(searchQuery, searchField || undefined);
       console.log('Search response:', data);
       setResults(data.results || []);
       setShowResults(true);
@@ -83,13 +56,17 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
       }
     } catch (err) {
       console.error('Search error:', err);
-      setError(err instanceof Error ? err.message : '검색 중 오류가 발생했습니다.');
+      if (err instanceof AdminApiError) {
+        setError(err.message);
+      } else {
+        setError('검색 중 오류가 발생했습니다.');
+      }
       setResults([]);
       setShowResults(true);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   // Debounced search effect
   useEffect(() => {

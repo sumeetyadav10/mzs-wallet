@@ -86,10 +86,13 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
 // Helper functions for common admin operations
 export const adminApi = {
   // Search users
-  searchUsers: (query: string, field?: string) =>
+  searchUsers: (searchTerm: string, field?: string) =>
     adminRequest('/api/admin/search-users', {
       method: 'POST',
-      body: JSON.stringify({ query, field }),
+      body: JSON.stringify({ 
+        searchTerm, 
+        searchFields: field ? [field] : undefined 
+      }),
     }),
 
   // Get user details
