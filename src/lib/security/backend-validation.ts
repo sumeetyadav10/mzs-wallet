@@ -18,6 +18,9 @@ export class BackendValidation {
 
   static validateJWTToken(token: string): ValidationResult {
     try {
+      if (!this.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined');
+      }
       const decoded = jwt.verify(token, this.JWT_SECRET);
       return { isValid: true, data: decoded };
     } catch (error) {

@@ -198,4 +198,23 @@ input:focus, select:focus, textarea:focus {
   border-radius: inherit;
   z-index: -1;
   opacity: 0.5;
-} 
+}
+
+/* OTP Input specific styles - Override global input styles */
+input[type="text"][inputmode="numeric"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Target OTP inputs specifically by their dark background */
+input.bg-\[\#181A20\] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Override for any input with dark backgrounds */
+.bg-\[\#181A20\] input[type="text"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+

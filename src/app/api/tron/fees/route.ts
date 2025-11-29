@@ -17,12 +17,12 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
     
-    const fees = await SecureTronService.estimateFees(
+    const fees = await SecureTronService.estimateFees({
       from,
       to,
-      parseFloat(amount),
-      token || undefined
-    );
+      amount: parseFloat(amount),
+      token: token || undefined
+    });
     
     // Get current TRX price for fee calculation
     let trxPrice = 0.13;

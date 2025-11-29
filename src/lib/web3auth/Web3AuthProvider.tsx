@@ -92,8 +92,22 @@ export const Web3AuthProvider = ({ children }: { children: React.ReactNode }) =>
           const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID || "";
           if (clientId) {
             try {
+              const privateKeyProvider = new EthereumPrivateKeyProvider({
+                config: {
+                  chainConfig: {
+                    chainNamespace: CHAIN_NAMESPACES.EIP155,
+                    chainId: "0x89", // Polygon mainnet
+                    rpcTarget: "https://polygon-rpc.com",
+                    displayName: "Polygon Mainnet",
+                    blockExplorerUrl: "https://polygonscan.com",
+                    ticker: "MATIC",
+                    tickerName: "MATIC",
+                  }
+                }
+              });
               const fallbackInstance = new Web3Auth({
                 clientId,
+                privateKeyProvider,
                 web3AuthNetwork: "sapphire_mainnet",
               });
               setWeb3auth(fallbackInstance);
@@ -121,8 +135,22 @@ export const Web3AuthProvider = ({ children }: { children: React.ReactNode }) =>
       }
       
       try {
+        const privateKeyProvider = new EthereumPrivateKeyProvider({
+          config: {
+            chainConfig: {
+              chainNamespace: CHAIN_NAMESPACES.EIP155,
+              chainId: "0x89", // Polygon mainnet
+              rpcTarget: "https://polygon-rpc.com",
+              displayName: "Polygon Mainnet",
+              blockExplorerUrl: "https://polygonscan.com",
+              ticker: "MATIC",
+              tickerName: "MATIC",
+            }
+          }
+        });
         const web3authInstance = new Web3Auth({
           clientId,
+          privateKeyProvider,
           web3AuthNetwork: "sapphire_mainnet",
           sessionTime: 86400,
         });

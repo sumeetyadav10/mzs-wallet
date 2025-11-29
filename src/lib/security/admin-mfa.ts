@@ -132,7 +132,7 @@ export class AdminMFA {
       const challenge = challengeDoc.data() as MFAChallenge;
 
       // Check if challenge is expired (handle Firestore timestamp)
-      const expirationTime = challenge.expiresAt.toDate ? challenge.expiresAt.toDate() : new Date(challenge.expiresAt);
+      const expirationTime = challenge.expiresAt instanceof Date ? challenge.expiresAt : new Date(challenge.expiresAt);
       if (new Date() > expirationTime) {
         await challengeDoc.ref.delete();
         return { success: false, error: 'Challenge expired' };

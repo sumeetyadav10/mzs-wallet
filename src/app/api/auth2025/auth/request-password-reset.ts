@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import bcrypt from 'bcryptjs';
-import { SecurityMiddleware } from '@/lib/security/security-middleware';
+import { securityMiddleware } from '@/lib/security/security-middleware';
 
 if (!getApps().length) {
   initializeApp({
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Verify CAPTCHA token with Google reCAPTCHA
-    const captchaResult = await SecurityMiddleware.verifyCaptcha(captchaToken);
+    const captchaResult = await securityMiddleware.verifyCaptcha(captchaToken);
     if (!captchaResult.success) {
       return NextResponse.json({ 
         error: 'CAPTCHA verification failed', 

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
                      'unknown';
 
     // Destroy the session
-    const destroyed = AdminSessionManager.destroySession(sessionId);
+    const destroyed = await AdminSessionManager.destroyAdminSession(sessionId);
 
     if (destroyed) {
       logger.info('🔓 Admin logged out successfully', {

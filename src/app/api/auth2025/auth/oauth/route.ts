@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { createAuthTokens } from '@/lib/security/auth-helper';
 import { securityManager } from '@/lib/security/session-manager-enhanced';
@@ -56,10 +57,18 @@ export async function POST(request: NextRequest) {
         const { verifyWeb3AuthIdToken } = await import('@/lib/web3auth-jwt-secure');
         verifiedUserData = await verifyWeb3AuthIdToken(idToken);
         
+        if (!verifiedUserData) {
+          logger.error('❌ Failed to verify Web3Auth ID token');
+          return NextResponse.json(
+            { error: 'Invalid Web3Auth token' },
+            { status: 401 }
+          );
+        }
+        
         logger.log('✅ Web3Auth ID token verified successfully:', {
           userId: verifiedUserData.userId,
           email: verifiedUserData.email,
-          provider: verifiedUserData.provider
+          provider: (verifiedUserData as any).provider
         });
         
         // Ensure the token's email matches the request email
@@ -152,18 +161,31 @@ export async function POST(request: NextRequest) {
       let existingUser = null;
       
       try {
-        existingUser = await SQLInjectionPrevention.safeUserQuery(email, 'auth_email');
-      } catch (queryError) {
-        // Try legacy email field as fallback with safe query
-        try {
-          existingUser = await SQLInjectionPrevention.safeUserQuery(email, 'email');
-        } catch (fallbackError) {
-          logger.log(`No existing user found for: ${email}`);
+        // First try auth_email field
+        const authEmailQuery = await db.collection('users')
+          .where('auth_email', '==', email)
+          .limit(1)
+          .get();
+        
+        if (!authEmailQuery.empty) {
+          existingUser = authEmailQuery.docs[0];
+        } else {
+          // Try legacy email field as fallback
+          const emailQuery = await db.collection('users')
+            .where('email', '==', email)
+            .limit(1)
+            .get();
+          
+          if (!emailQuery.empty) {
+            existingUser = emailQuery.docs[0];
+          }
         }
+      } catch (queryError) {
+        logger.log(`Error querying user: ${queryError}`);
       }
       
       if (existingUser) {
-        const userData = existingUser.data;
+        const userData = existingUser.data();
         firebaseUserId = userData.user_id || email;
         userEmail = userData.auth_email || userData.email || email;
         
@@ -244,13 +266,11 @@ export async function POST(request: NextRequest) {
     
     // Still create session in security manager for audit trail
     try {
-      securityManager.createSession({
+      await securityManager.createSession({
         userId: sessionData.userId,
         email: sessionData.email,
-        isAdmin: sessionData.isAdmin,
-        ipAddress,
-        userAgent,
-        deviceFingerprint: clientDeviceFingerprint || undefined
+        deviceFingerprint: clientDeviceFingerprint || crypto.randomUUID(),
+        isAdmin: sessionData.isAdmin
       });
     } catch (e) {
       // Don't fail if session creation fails (cache might be full)

@@ -19,12 +19,12 @@ const ALGORITHM = 'aes-256-gcm';
 export function encryptPrivateKey(privateKey: string, userEmail: string): string {
   try {
     const salt = crypto.randomBytes(16);
-    const iv = crypto.randomBytes(12);
+    const iv = crypto.randomBytes(16);
     
     // Derive key using user email as additional entropy
     const key = crypto.pbkdf2Sync(ENCRYPTION_KEY + userEmail, salt, 10000, 32, 'sha512');
     
-    const cipher = crypto.createCipherGCM(ALGORITHM, key, iv);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     
     let encrypted = cipher.update(privateKey, 'utf8', 'hex');
     encrypted += cipher.final('hex');
@@ -48,17 +48,17 @@ export function decryptPrivateKey(encryptedPrivateKey: string, userEmail: string
     const combined = Buffer.from(encryptedPrivateKey, 'base64');
     
     const salt = combined.subarray(0, 16);
-    const iv = combined.subarray(16, 28);
-    const authTag = combined.subarray(28, 44);
-    const encrypted = combined.subarray(44);
+    const iv = combined.subarray(16, 32);
+    const authTag = combined.subarray(32, 48);
+    const encrypted = combined.subarray(48);
     
     // Derive the same key using user email
     const key = crypto.pbkdf2Sync(ENCRYPTION_KEY + userEmail, salt, 10000, 32, 'sha512');
     
-    const decipher = crypto.createDecipherGCM(ALGORITHM, key, iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
     
-    let decrypted = decipher.update(encrypted, null, 'utf8');
+    let decrypted = decipher.update(encrypted, undefined, 'utf8');
     decrypted += decipher.final('utf8');
     
     return decrypted;
@@ -90,8 +90,18 @@ export function verifyHashedData(data: string, hashedData: string): boolean {
   try {
     const [salt, hash] = hashedData.split(':');
     const verifyHash = crypto.pbkdf2Sync(data, salt, 10000, 32, 'sha512').toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const verifyBuffer = Buffer.from(verifyHash, 'hex');
+    return hashBuffer.length === verifyBuffer.length && crypto.timingSafeEqual(hashBuffer, verifyBuffer);
   } catch {
     return false;
   }
+}
+
+/**
+ * Log security event
+ */
+export function logSecurityEvent(event: any): void {
+  // This is a placeholder that should be replaced with actual logging
+  console.log('Security event:', event);
 }

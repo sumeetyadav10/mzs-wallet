@@ -36,10 +36,15 @@ async function fetchWeb3AuthJWKS(): Promise<any[]> {
     try {
       logger.log(`🔍 Fetching JWKS from: ${jwksUrl}`);
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       const response = await fetch(jwksUrl, { 
-        timeout: 5000,
+        signal: controller.signal,
         headers: { 'User-Agent': 'MZS-Wallet/1.0' }
       });
+      
+      clearTimeout(timeoutId);
       
       if (response.ok) {
         const jwks = await response.json();

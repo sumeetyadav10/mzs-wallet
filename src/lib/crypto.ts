@@ -13,6 +13,9 @@ export class CryptoUtils {
   static encrypt(text: string, key?: string): string {
     try {
       const encryptionKey = key || this.ENCRYPTION_KEY;
+      if (!encryptionKey) {
+        throw new Error('Encryption key is required');
+      }
       const encrypted = CryptoJS.AES.encrypt(text, encryptionKey).toString();
       return encrypted;
     } catch (error) {
@@ -24,6 +27,9 @@ export class CryptoUtils {
   static decrypt(encryptedText: string, key?: string): string {
     try {
       const encryptionKey = key || this.ENCRYPTION_KEY;
+      if (!encryptionKey) {
+        throw new Error('Encryption key is required');
+      }
       const decrypted = CryptoJS.AES.decrypt(encryptedText, encryptionKey);
       const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
       

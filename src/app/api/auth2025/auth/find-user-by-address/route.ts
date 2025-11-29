@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   // 🔒 SIMPLE SECURITY FOR PASSWORD RESET - CAPTCHA + RATE LIMITING ONLY
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
   
   // Basic CORS check

@@ -4,13 +4,14 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 // Rate limiter for different types of requests
 const rateLimiter = new RateLimiterMemory({
-  keyGenerator: (req: NextRequest) => req.ip || 'unknown',
   points: 10, // 10 requests
   duration: 60, // per 60 seconds
 });
 
 export interface SecurityMiddlewareOptions {
   requireCaptcha?: boolean;
+  requireAuth?: boolean;
+  requireAdminRole?: boolean;
   maxAttempts?: number;
   windowMinutes?: number;
   blockSuspiciousIPs?: boolean;
@@ -71,11 +72,17 @@ export const securityMiddleware = {
   ): Promise<NextResponse | null> {
     try {
       // Rate limiting
-      await rateLimiter.consume(request.ip || 'unknown');
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+                 request.headers.get('x-real-ip') || 
+                 'unknown';
+      await rateLimiter.consume(ip);
       return null; // No security issues
     } catch (rateLimitError) {
+      const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+                 request.headers.get('x-real-ip') || 
+                 'unknown';
       logger.warn('Rate limit exceeded', {
-        ip: request.ip,
+        ip,
         endpoint: request.nextUrl.pathname
       });
       return NextResponse.json(
@@ -121,6 +128,18 @@ export const securityMiddleware = {
       logger.error('CAPTCHA verification error', { error, action });
       return { success: false, error: 'CAPTCHA verification error' };
     }
+  },
+
+  createSecureHeaders(): Record<string, string> {
+    return {
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://www.google.com; frame-src https://www.google.com;"
+    };
   }
 };
 

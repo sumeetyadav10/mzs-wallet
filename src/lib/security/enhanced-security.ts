@@ -139,7 +139,7 @@ export class SecAuth {
 
   private static cleanupExpiredChallenges() {
     const now = Date.now();
-    for (const [challengeId, challenge] of this.challenges.entries()) {
+    for (const [challengeId, challenge] of Array.from(this.challenges.entries())) {
       if (now > challenge.expires) {
         this.challenges.delete(challengeId);
       }

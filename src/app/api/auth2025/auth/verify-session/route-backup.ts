@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
   // Apply rate limiting to prevent session enumeration attacks
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the session
-    const session = securityManager.verifySession(sessionToken, ipAddress, userAgent);
+    const session = await securityManager.verifySession(sessionToken);
 
     if (!session) {
       securityManager.logSecurityEvent({

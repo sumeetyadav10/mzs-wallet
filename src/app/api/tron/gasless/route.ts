@@ -57,15 +57,20 @@ export async function POST(request: NextRequest) {
     const { requireAuth } = await import('@/lib/security/auth-helper');
     
     // Verify authentication
-    const authResult = await requireAuth(request, { allowRefresh: true });
-    if ('status' in authResult) {
-      return authResult; // Return error response
+    let session;
+    try {
+      const authResult = await requireAuth(request, true);
+      session = authResult.session;
+    } catch (error) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
-    const { session } = authResult;
-    
     // Rate limiting per user instead of IP
-    if (isTxRateLimited(session.userId)) {
+    if (!session) {
+      return NextResponse.json({ error: 'Session required' }, { status: 401 });
+    }
+    
+    if (isTxRateLimited(session.userId || '')) {
       return NextResponse.json({ 
         error: 'Transaction rate limit exceeded',
         message: 'Please wait before sending another transaction'
@@ -165,7 +170,7 @@ export async function POST(request: NextRequest) {
     
     // Log successful OTP validation for gasless withdrawal
     await db.collection('audit_logs').add({
-      userId: session.userId,
+      userId: session?.userId || 'unknown',
       action: 'GASLESS_WITHDRAWAL_OTP_VALIDATED',
       details: {
         blockchain: 'tron',
@@ -264,7 +269,7 @@ export async function POST(request: NextRequest) {
       if (token && token !== 'TRX') {
         // Check if it's a known token symbol
         if (token in TRON_TOKENS) {
-          tokenAddress = TRON_TOKENS[token as keyof typeof TRON_TOKENS];
+          tokenAddress = (TRON_TOKENS as any)[token].address || (TRON_TOKENS as any)[token];
           logger.log(`[Tron Gasless API] Resolved token ${token} to ${tokenAddress}`);
         } else if (token.startsWith('T') && token.length === 34) {
           // It's already a token address
@@ -278,12 +283,12 @@ export async function POST(request: NextRequest) {
       }
       
       // Execute gasless transaction
-      const result = await SecureTronService.sendGasless(
+      const result = await SecureTronService.sendGasless({
         privateKey,
         toAddress,
         amount,
         tokenAddress
-      );
+      });
       
       if (!result.success) {
         txRecord.status = 'failed';

@@ -11,7 +11,9 @@ export async function POST(request: NextRequest) {
     
     const token = authHeader.substring(7);
     const deviceFingerprint = request.headers.get('x-device-fingerprint') || '';
-    const ip = request.ip || '::1';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+               request.headers.get('x-real-ip') || 
+               '::1';
     
     // Validate the session
     const result = await SecureSessionManager.validateSession(token, deviceFingerprint, ip);

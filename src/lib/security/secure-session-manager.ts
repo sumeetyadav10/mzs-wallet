@@ -60,15 +60,8 @@ export class SecureSessionManager extends SessionManager {
     };
   }
 
-  // Legacy method for compatibility
-  static async createSession(userData: any, deviceFingerprint: string): Promise<string> {
-    const sessionData = {
-      userId: userData.userId || userData.email,
-      email: userData.email,
-      deviceFingerprint,
-      isAdmin: userData.isAdmin || false
-    };
-    
+  // Override parent method with compatible signature
+  static async createSession(sessionData: Omit<import('./session-manager').SessionData, 'sessionId' | 'expiresAt'>): Promise<string> {
     logger.info('Creating legacy secure session', {
       userId: sessionData.userId,
       email: sessionData.email

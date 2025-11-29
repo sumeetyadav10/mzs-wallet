@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
   
   // 🔒 CRITICAL OPERATION: PRIVATE KEY ACCESS
@@ -330,6 +330,13 @@ export async function GET(request: NextRequest) {
     
     // Verify session
     const session = await verifyJWTToken(token);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Invalid or expired session' },
+        { status: 401 }
+      );
+    }
     
     // Generate security challenge
     const challenge = SecAuth.generateChallenge(session.userId, 'get_private_key');

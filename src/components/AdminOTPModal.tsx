@@ -125,18 +125,18 @@ export default function AdminOTPModal({
               {Array.from({ length: 6 }).map((_, index) => (
                 <input
                   key={index}
-                  ref={el => inputRefs.current[index] = el!}
+                  ref={el => {
+                    if (el) inputRefs.current[index] = el;
+                  }}
                   type="text"
+                  inputMode="numeric"
+                  pattern="\d*"
                   maxLength={1}
-                  className="w-12 h-12 text-center text-lg font-bold rounded-xl border-2 border-[var(--golf-gold)]/30 focus:border-[var(--golf-gold)] focus:ring-2 focus:ring-[var(--golf-gold)]/20 bg-white/90 text-[var(--golf-dark)]"
+                  className="w-12 h-12 text-center text-xl font-bold border-2 border-[#2C2F36] bg-[#181A20] text-white rounded-lg focus:border-[#1aDb749F] focus:outline-none transition-colors"
                   value={code[index] || ''}
                   onChange={e => handleInputChange(index, e.target.value)}
                   onKeyDown={e => handleKeyDown(index, e)}
                   disabled={verifying}
-                  style={{
-                    color: '#000000 !important',
-                    WebkitTextFillColor: '#000000 !important'
-                  }}
                 />
               ))}
             </div>
@@ -177,22 +177,6 @@ export default function AdminOTPModal({
         </div>
       </div>
 
-      <style jsx>{`
-        /* Nuclear-level CSS overrides for OTP input visibility */
-        input[type="text"] {
-          color: #000000 !important;
-          -webkit-text-fill-color: #000000 !important;
-          background-color: rgba(255, 255, 255, 0.9) !important;
-        }
-        input[type="text"]:focus {
-          color: #000000 !important;
-          -webkit-text-fill-color: #000000 !important;
-        }
-        input[type="text"]::placeholder {
-          color: #666666 !important;
-          -webkit-text-fill-color: #666666 !important;
-        }
-      `}</style>
     </div>
   );
 }

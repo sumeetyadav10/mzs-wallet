@@ -134,7 +134,7 @@ export default function Dashboard() {
     try {
       const validation = await AddressValidator.validateAddress(
         address, 
-        selectedChain as 'polygon' | 'ethereum' | 'solana' | 'tron'
+        selectedChain as 'polygon' | 'ethereum' | 'tron'
       );
       setAddressValidation(validation);
     } catch (error) {
@@ -1143,7 +1143,7 @@ export default function Dashboard() {
           toAddress={pendingWithdrawal.toAddress}
           blockchain={pendingWithdrawal.blockchain}
           loading={secureWithdrawalLoading}
-          error={secureWithdrawalError}
+          error={secureWithdrawalError || undefined}
           otpId={otpData?.otpId}
           expiresAt={otpData?.expiresAt}
         />

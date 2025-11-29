@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { compare } from 'bcryptjs';
+import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { securityManager } from '@/lib/security/session-manager';
 import { securityMiddleware } from '@/lib/security/security-middleware';
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
   
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
   // CRITICAL: Block all direct API access - only allow from website
@@ -187,11 +188,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create secure session
-    const sessionToken = securityManager.createSession({
+    const sessionToken = await securityManager.createSession({
       userId: userDoc.id,
       email: user_id,
-      ipAddress,
-      userAgent,
+      deviceFingerprint: crypto.randomUUID(),
       isAdmin: userData.role === 'admin' || userData.isAdmin === true
     });
     

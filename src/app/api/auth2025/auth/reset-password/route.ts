@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
   // CRITICAL: Block all direct API access - only allow from website
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
-    const session = securityManager.verifySession(sessionToken, ipAddress, userAgent);
+    const session = await securityManager.verifySession(sessionToken);
     if (!session) {
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                       request.headers.get('x-real-ip') || 
-                      request.ip || 'unknown';
+                      'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     
     securityManager.logSecurityEvent({

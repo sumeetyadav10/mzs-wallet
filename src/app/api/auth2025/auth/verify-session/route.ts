@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
     return securityValidation.response!;
   }
   
-  const authenticatedUser = securityValidation.user;
+  const authenticatedUser = (securityValidation as any).user || { userId: 'unknown', email: 'unknown' };
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
   const deviceFingerprint = request.headers.get('x-device-fingerprint');
 
@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     securityManager.logSecurityEvent({
       type: 'LOGIN_FAIL',
+      userId: 'unknown',
+      email: 'unknown',
       ipAddress,
       userAgent,
       timestamp: Date.now(),

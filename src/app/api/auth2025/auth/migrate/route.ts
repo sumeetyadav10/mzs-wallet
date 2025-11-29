@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   
   const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0] || 
                     req.headers.get('x-real-ip') || 
-                    req.ip || 'unknown';
+                    'unknown';
   const userAgent = req.headers.get('user-agent') || 'unknown';
 
   // CRITICAL: Block all direct API access - only allow from website
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
-    const session = securityManager.verifySession(sessionToken, ipAddress, userAgent);
+    const session = await securityManager.verifySession(sessionToken);
     if (!session) {
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',

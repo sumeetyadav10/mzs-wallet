@@ -52,15 +52,20 @@ export async function POST(req: NextRequest) {
     const { requireAuth } = await import('@/lib/security/auth-helper');
     
     // Verify authentication
-    const authResult = await requireAuth(req, { allowRefresh: true });
-    if ('status' in authResult) {
-      return authResult; // Return error response
+    let session;
+    try {
+      const authResult = await requireAuth(req, true);
+      session = authResult.session;
+    } catch (error) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
-    const { session } = authResult;
-    
     // Check rate limit
-    if (isRateLimited(session.userId)) {
+    if (!session) {
+      return NextResponse.json({ error: 'Session required' }, { status: 401 });
+    }
+    
+    if (isRateLimited(session.userId || '')) {
       return NextResponse.json({ 
         error: 'Rate limit exceeded',
         message: `Maximum ${MAX_REQUESTS} gasless transactions per minute`
@@ -132,7 +137,7 @@ export async function POST(req: NextRequest) {
     
     // Log successful OTP validation for gasless withdrawal
     await db.collection('audit_logs').add({
-      userId: session.userId,
+      userId: session?.userId || 'unknown',
       action: 'GASLESS_WITHDRAWAL_OTP_VALIDATED',
       details: {
         blockchain: 'polygon',
@@ -151,7 +156,7 @@ export async function POST(req: NextRequest) {
     // This prevents users from submitting transactions on behalf of others
     // Note: We'll need to verify this matches the user's wallet address
     
-    logger.log('Relayer call params:', { user, token, recipient, amount, signature, authenticatedEmail: session.email });
+    logger.log('Relayer call params:', { user, token, recipient, amount, signature, authenticatedEmail: session?.email });
     
     const provider = new ethers.JsonRpcProvider(POLYGON_RPC_URL);
     const relayerWallet = new ethers.Wallet(RELAYER_PRIVATE_KEY, provider);

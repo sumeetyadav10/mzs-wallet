@@ -2,22 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// CSS-in-JS for forcing text color - nuclear approach
-const otpInputStyles = {
-  color: '#000000 !important',
-  backgroundColor: '#ffffff !important',
-  WebkitTextFillColor: '#000000 !important',
-  WebkitTextStrokeColor: '#000000 !important',
-  MozTextFillColor: '#000000 !important',
-  textShadow: 'none !important',
-  filter: 'none !important',
-  opacity: '1 !important',
-  caretColor: '#000000 !important',
-  // Override any parent color inheritance
-  fontFamily: 'inherit',
-  fontSize: '1.25rem',
-  fontWeight: '700'
-} as React.CSSProperties;
 
 interface OTPVerificationProps {
   isOpen: boolean;
@@ -90,51 +74,6 @@ export default function OTPVerification({
     }
   }, [isOpen, otpId, expiresAt]);
 
-  // Force text color with CSS injection
-  useEffect(() => {
-    if (isOpen) {
-      const style = document.createElement('style');
-      style.id = 'otp-force-black-style';
-      style.textContent = `
-        .otp-input-force-black, 
-        .otp-input-force-black:focus, 
-        .otp-input-force-black:active, 
-        .otp-input-force-black:hover {
-          color: #000000 !important;
-          background-color: #ffffff !important;
-          -webkit-text-fill-color: #000000 !important;
-          -webkit-text-stroke-color: #000000 !important;
-          -moz-text-fill-color: #000000 !important;
-          text-shadow: none !important;
-          filter: none !important;
-          opacity: 1 !important;
-          caret-color: #000000 !important;
-          font-size: 1.25rem !important;
-          font-weight: 700 !important;
-        }
-        .otp-input-force-black::placeholder,
-        .otp-input-force-black::-webkit-input-placeholder,
-        .otp-input-force-black::-moz-placeholder {
-          color: #666666 !important;
-          opacity: 1 !important;
-        }
-        /* Override any parent text-white classes */
-        .text-white .otp-input-force-black,
-        [class*="text-white"] .otp-input-force-black {
-          color: #000000 !important;
-          -webkit-text-fill-color: #000000 !important;
-        }
-      `;
-      document.head.appendChild(style);
-
-      return () => {
-        const existingStyle = document.getElementById('otp-force-black-style');
-        if (existingStyle) {
-          document.head.removeChild(existingStyle);
-        }
-      };
-    }
-  }, [isOpen]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -393,8 +332,7 @@ export default function OTPVerification({
                       onChange={e => handleInputChange(index, e.target.value)}
                       onKeyDown={e => handleKeyDown(index, e)}
                       onPaste={handlePaste}
-                      className="otp-input-force-black w-12 h-12 text-center text-xl font-bold border-2 border-[#2C2F36] rounded-lg focus:border-[#1aDb749F] focus:outline-none transition-colors"
-                      style={otpInputStyles}
+                      className="w-12 h-12 text-center text-xl font-bold border-2 border-[#2C2F36] bg-[#181A20] text-white rounded-lg focus:border-[#1aDb749F] focus:outline-none transition-colors"
                       disabled={loading}
                     />
                   ))}
@@ -482,6 +420,7 @@ export default function OTPVerification({
           </div>
         </motion.div>
       </div>
+      
     </AnimatePresence>
   );
 }

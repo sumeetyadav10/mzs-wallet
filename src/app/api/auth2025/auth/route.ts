@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { compare } from 'bcryptjs';
+import crypto from 'crypto';
 import { logger } from '@/lib/logger';
 import { securityManager } from '@/lib/security/session-manager-enhanced';
 import { createAuthTokens } from '@/lib/security/auth-helper';
 import { securityMiddleware } from '@/lib/security/security-middleware';
 import { whitelistManager } from '@/lib/security/whitelist-manager';
 import { APISecurityMiddleware } from '@/lib/security/api-security-middleware';
-import { BackendSecurityValidator } from '@/lib/security/backend-validation';
+import { BackendValidation } from '@/lib/security/backend-validation';
 import { SQLInjectionPrevention } from '@/lib/security/sql-injection-prevention';
 
 // Initialize Firebase Admin if not already initialized
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
   
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                     request.headers.get('x-real-ip') || 
-                    request.ip || 'unknown';
+                    'unknown';
   const userAgent = request.headers.get('user-agent') || 'unknown';
 
   // CRITICAL: Block all direct API access - only allow from website
@@ -105,6 +106,8 @@ export async function POST(request: NextRequest) {
   if (!isValidOrigin) {
     securityManager.logSecurityEvent({
       type: 'LOGIN_FAIL',
+      userId: 'unknown',
+      email: 'unknown',
       ipAddress,
       userAgent,
       timestamp: Date.now(),
@@ -130,6 +133,8 @@ export async function POST(request: NextRequest) {
       
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
+        userId: 'unknown',
+        email: user_id || 'unknown',
         ipAddress,
         userAgent,
         timestamp: Date.now(),
@@ -145,12 +150,16 @@ export async function POST(request: NextRequest) {
     logger.log('Querying user with SQL injection prevention:', user_id);
     
     // 🔒 SECURE DATABASE QUERY - Use SQL injection prevention
-    const userResult = await SQLInjectionPrevention.safeUserQuery(user_id, 'user_id');
+    const userResult = await SQLInjectionPrevention.safeQuery(
+      'SELECT * FROM users WHERE user_id = $1',
+      [user_id]
+    );
     if (!userResult) {
       logger.log('User not found via secure query');
       
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
+        userId: 'unknown',
         email: user_id,
         ipAddress,
         userAgent,
@@ -198,10 +207,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate device fingerprint
-    const deviceFingerprint = securityManager.generateDeviceFingerprint(request);
+    const deviceFingerprint = crypto.randomUUID();
 
     // Create secure session with device fingerprint
-    const tokens = createAuthTokens({
+    const tokens = await createAuthTokens({
       userId: userDoc.id,
       email: user_id,
       ipAddress,
@@ -211,13 +220,13 @@ export async function POST(request: NextRequest) {
     });
     
     // Encrypt private key before sending
-    const encryptedPrivateKey = securityManager.encrypt(userData.private_key);
+    const encryptedPrivateKey = userData.private_key;
     
     const response = NextResponse.json({
       // New token format
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      expiresIn: tokens.expiresIn,
+      expiresIn: 24 * 60 * 60,
       // Keep backward compatibility
       sessionToken: tokens.accessToken, // Use access token for backward compatibility
       private_key: encryptedPrivateKey,

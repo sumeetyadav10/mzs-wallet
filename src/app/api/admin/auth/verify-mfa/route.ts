@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AdminMFA } from '@/lib/security/admin-mfa';
 import { AdminSessionManager } from '@/lib/security/admin-session-manager';
 import { logger } from '@/lib/logger';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,11 +17,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
-    const { tempToken, otpCode, email } = await request.json();
+    const { challengeId, otpCode, email } = await request.json();
 
-    if (!tempToken || !otpCode || !email) {
+    if (!challengeId || !otpCode || !email) {
       return NextResponse.json(
-        { error: 'Temp token, OTP code, and email required' },
+        { error: 'Challenge ID, OTP code, and email required' },
         { status: 400 }
       );
     }
@@ -30,15 +31,15 @@ export async function POST(request: NextRequest) {
                      request.headers.get('x-real-ip') || 
                      'unknown';
 
-    // 1. Verify OTP code
+    // 1. Verify MFA challenge
     logger.info('🔍 DEBUG: MFA verification attempt', {
       email,
       otpCode,
       ipAddress,
-      tempToken: tempToken.substring(0, 8) + '...'
+      challengeId: challengeId.substring(0, 8) + '...'
     });
     
-    const otpResult = AdminMFA.verifyOTP(email, otpCode, ipAddress);
+    const otpResult = await AdminMFA.verifyMFAChallenge(challengeId, otpCode);
 
     logger.info('🔍 DEBUG: OTP verification result', {
       email,
@@ -50,37 +51,20 @@ export async function POST(request: NextRequest) {
       logger.warn('🚨 Admin OTP verification failed', {
         email,
         ipAddress,
-        error: otpResult.error,
-        remainingAttempts: otpResult.remainingAttempts
+        error: otpResult.error
       });
       return NextResponse.json(
         { 
-          error: otpResult.error,
-          remainingAttempts: otpResult.remainingAttempts
+          error: otpResult.error
         },
         { status: 400 }
       );
     }
 
-    // 2. Retrieve and consume pending authentication data
-    const pendingAuth = AdminMFA.consumePendingAuth(tempToken);
-
-    if (!pendingAuth) {
-      logger.warn('🚨 Invalid or expired temp token in MFA verification', {
-        email,
-        ipAddress,
-        tempToken: tempToken.substring(0, 8) + '...'
-      });
-      return NextResponse.json(
-        { error: 'Invalid or expired authentication session' },
-        { status: 400 }
-      );
-    }
-
-    // 3. Security checks
-    if (pendingAuth.email !== email) {
+    // 2. Security check - verify email matches
+    if (otpResult.email !== email) {
       logger.error('🚨 Email mismatch in MFA verification', {
-        pendingEmail: pendingAuth.email,
+        challengeEmail: otpResult.email,
         providedEmail: email,
         ipAddress
       });
@@ -90,41 +74,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (pendingAuth.ipAddress !== ipAddress) {
-      logger.error('🚨 IP address mismatch in MFA verification', {
-        pendingIP: pendingAuth.ipAddress,
-        currentIP: ipAddress,
-        email
-      });
-      return NextResponse.json(
-        { error: 'Authentication session invalid - security violation' },
-        { status: 403 }
-      );
-    }
-
-    // 4. Create admin session
-    const sessionId = AdminSessionManager.createSession(
-      pendingAuth.email,
-      pendingAuth.userId,
+    // 3. Create admin session
+    const { sessionToken } = await AdminSessionManager.createAdminSession({
+      adminId: otpResult.adminId!,
+      email: otpResult.email!,
+      role: 'admin',
+      permissions: ['all'],
       ipAddress,
-      request.headers.get('user-agent') || 'unknown',
-      pendingAuth.deviceFingerprint
-    );
-
-    logger.info('✅ Admin MFA completed successfully - session created', {
-      email: pendingAuth.email,
-      ipAddress,
-      sessionId: sessionId.substring(0, 8) + '...'
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      deviceFingerprint: crypto.randomUUID() // Generate device fingerprint
     });
 
-    // 5. Set secure session cookie
+    logger.info('✅ Admin MFA completed successfully - session created', {
+      email: otpResult.email,
+      ipAddress,
+      sessionId: sessionToken.substring(0, 8) + '...'
+    });
+
+    // 4. Set secure session cookie
     const response = NextResponse.json({
       success: true,
-      sessionId,
+      sessionId: sessionToken,
       message: 'Admin authentication completed'
     });
 
-    response.cookies.set('admin-session', sessionId, {
+    response.cookies.set('admin-session', sessionToken, {
       httpOnly: false, // Allow JavaScript access for admin API calls
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

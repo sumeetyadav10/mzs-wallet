@@ -12,10 +12,13 @@ export class JWTSecurityEnhanced {
   
   static async createSecureJWT(payload: any, expiresIn: string = '24h'): Promise<string> {
     try {
+      if (!this.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined');
+      }
       const token = jwt.sign(payload, this.JWT_SECRET, {
         expiresIn,
         algorithm: 'HS256'
-      });
+      } as jwt.SignOptions);
       
       logger.info('Secure JWT created', {
         userId: payload.userId,
@@ -31,6 +34,9 @@ export class JWTSecurityEnhanced {
   
   static async verifySecureJWT(token: string): Promise<any> {
     try {
+      if (!this.JWT_SECRET) {
+        throw new Error('JWT_SECRET is not defined');
+      }
       const decoded = jwt.verify(token, this.JWT_SECRET);
       return decoded;
     } catch (error) {

@@ -44,12 +44,13 @@ export async function POST(request: NextRequest) {
     const { requireAuth } = await import('@/lib/security/auth-helper');
     
     // Verify authentication
-    const authResult = await requireAuth(request, { allowRefresh: true });
-    if ('status' in authResult) {
-      return authResult; // Return error response
+    let session;
+    try {
+      const authResult = await requireAuth(request, true);
+      session = authResult.session;
+    } catch (error) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
-    const { session } = authResult;
     
     // Add API call delay to prevent rate limiting
     const now = Date.now();
@@ -62,7 +63,11 @@ export async function POST(request: NextRequest) {
     lastTronApiCall = Date.now();
     
     // Rate limiting for transactions per user
-    if (isTxRateLimited(session.userId)) {
+    if (!session) {
+      return NextResponse.json({ error: 'Session required' }, { status: 401 });
+    }
+    
+    if (isTxRateLimited(session.userId || '')) {
       return NextResponse.json({ 
         error: 'Transaction rate limit exceeded',
         message: 'Please wait before sending another transaction'
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest) {
     
     // Log successful OTP validation for withdrawal
     await db.collection('audit_logs').add({
-      userId: session.userId,
+      userId: session?.userId || 'unknown',
       action: 'WITHDRAWAL_OTP_VALIDATED',
       details: {
         blockchain: 'tron',
@@ -189,7 +194,7 @@ export async function POST(request: NextRequest) {
         let tokenAddress: string;
         
         if (token in TRON_TOKENS) {
-          tokenAddress = TRON_TOKENS[token as keyof typeof TRON_TOKENS];
+          tokenAddress = (TRON_TOKENS as any)[token].address || (TRON_TOKENS as any)[token];
           logger.log(`[Tron Send API] Resolved token ${token} to ${tokenAddress}`);
         } else if (token.startsWith('T') && token.length === 34) {
           // It's already a token address
@@ -218,7 +223,7 @@ export async function POST(request: NextRequest) {
       try {
         const { EmailService } = await import('@/lib/email-service');
         await EmailService.sendWithdrawalAlert(
-          session.email || '',
+          session?.email || '',
           amount.toString(),
           token || 'TRX',
           toAddress

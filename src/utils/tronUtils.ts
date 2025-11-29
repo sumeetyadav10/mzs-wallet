@@ -58,9 +58,11 @@ export async function getTronWallet(): Promise<TronWallet> {
           console.warn('⚠️ Tron wallet database error - using fallback');
           return {
             address: 'TDummyAddressForDevelopmentOnly12345',
-            email: 'development@example.com',
             energyDelegated: false,
-            message: 'Development fallback wallet'
+            resources: {
+              energy: 0,
+              bandwidth: 0
+            }
           };
         }
         throw new Error('Tron wallet service temporarily unavailable');

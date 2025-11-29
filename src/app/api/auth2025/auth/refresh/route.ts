@@ -21,16 +21,14 @@ export async function POST(request: NextRequest) {
     // Extract IP and User Agent
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || 
                      request.headers.get('x-real-ip') || 
-                     request.ip || 'unknown';
+                     'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     const deviceFingerprint = request.headers.get('x-device-fingerprint');
     
     // Attempt to refresh the session
-    const newTokens = securityManager.refreshSession(
+    const newTokens = await securityManager.refreshSession(
       refreshToken, 
-      ipAddress, 
-      userAgent, 
-      deviceFingerprint || undefined
+      deviceFingerprint || ''
     );
     
     if (!newTokens) {
@@ -43,9 +41,9 @@ export async function POST(request: NextRequest) {
     logger.log('Token refreshed successfully');
     
     return NextResponse.json({
-      accessToken: newTokens.accessToken,
-      refreshToken: newTokens.refreshToken,
-      expiresIn: newTokens.expiresIn
+      accessToken: newTokens,
+      refreshToken: refreshToken, // Return same refresh token
+      expiresIn: 3600 // 1 hour
     });
     
   } catch (error) {

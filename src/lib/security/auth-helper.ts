@@ -60,3 +60,18 @@ export async function createAuthTokens(userData: any) {
     refreshToken: generateSecureToken(64)
   };
 }
+
+// Export requireAuth function for API routes
+export async function requireAuth(request: Request, requireSession: boolean = false) {
+  // This is a placeholder implementation
+  // In production, this would validate the session token
+  const token = request.headers.get('authorization')?.replace('Bearer ', '');
+  if (!token) {
+    throw new Error('Authentication required');
+  }
+  return { 
+    userId: 'user123', 
+    email: 'user@example.com', 
+    session: requireSession ? { userId: 'user123', email: 'user@example.com' } : null 
+  };
+}

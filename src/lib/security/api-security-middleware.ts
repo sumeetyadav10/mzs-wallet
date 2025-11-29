@@ -5,17 +5,14 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 // Rate limiters for different endpoints
 const rateLimiters = {
   auth: new RateLimiterMemory({
-    keyGenerator: (req: NextRequest) => req.ip || 'unknown',
     points: 5, // 5 attempts
     duration: 60, // per 60 seconds
   }),
   api: new RateLimiterMemory({
-    keyGenerator: (req: NextRequest) => req.ip || 'unknown',
     points: 60, // 60 requests
     duration: 60, // per 60 seconds
   }),
   wallet: new RateLimiterMemory({
-    keyGenerator: (req: NextRequest) => req.ip || 'unknown',
     points: 10, // 10 requests
     duration: 60, // per 60 seconds
   })
@@ -48,7 +45,7 @@ export class APISecurityMiddleware {
       return xRealIp;
     }
     
-    return request.ip || 'unknown';
+    return 'unknown';
   }
 
   static async validateRequest(
@@ -85,10 +82,12 @@ export class APISecurityMiddleware {
       const rateLimiter = rateLimiters[rateLimitType];
       if (rateLimiter) {
         try {
-          await rateLimiter.consume(request.ip || 'unknown');
+          const ip = this.extractClientIP(request);
+          await rateLimiter.consume(ip);
         } catch (rateLimitError) {
+          const ip = this.extractClientIP(request);
           logger.warn('Rate limit exceeded', {
-            ip: request.ip,
+            ip,
             endpoint: request.nextUrl.pathname,
             type: rateLimitType
           });
@@ -115,7 +114,7 @@ export class APISecurityMiddleware {
         const deviceFingerprint = request.headers.get('x-device-fingerprint');
         if (!deviceFingerprint) {
           logger.warn('Missing device fingerprint', {
-            ip: request.ip,
+            ip: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown',
             endpoint: request.nextUrl.pathname
           });
           return {
@@ -130,7 +129,7 @@ export class APISecurityMiddleware {
       logger.info('API request validated', {
         method: request.method,
         endpoint: request.nextUrl.pathname,
-        ip: request.ip,
+        ip: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent')?.substring(0, 100)
       });
 

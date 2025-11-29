@@ -216,7 +216,7 @@ export default function ForgotPassword() {
                 marginBottom: 8,
                 opacity: (!captchaValue && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) ? 0.5 : 1
               }} 
-              disabled={isLoading || (!captchaValue && process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY)}
+              disabled={isLoading || (!captchaValue && !!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY)}
             >
               {isLoading ? (
                 <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>

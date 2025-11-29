@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      const response = {
+      const response: any = {
         private_key: private_key, // In production, return encrypted version
         wallet_address: walletAddress,
         auth_email: email,
@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const response = {
+    const response: any = {
       private_key: privateKey, // In production, this would be re-encrypted for transport
       wallet_address: walletAddress,
       auth_email: email,

@@ -53,12 +53,13 @@ export async function POST(request: NextRequest) {
     const { requireAuth } = await import('@/lib/security/auth-helper');
     
     // Verify authentication
-    const authResult = await requireAuth(request, { allowRefresh: true });
-    if ('status' in authResult) {
-      return authResult; // Return error response
+    let session;
+    try {
+      const authResult = await requireAuth(request, true);
+      session = authResult.session;
+    } catch (error) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
-    const { session } = authResult;
     
     const { address, amount } = await request.json();
     
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     // SECURITY: Verify the user owns this address
     // First, get the user's Tron address from the database
     const usersRef = db.collection('users');
-    const userSnapshot = await usersRef.where('auth_email', '==', session.email).limit(1).get();
+    const userSnapshot = await usersRef.where('auth_email', '==', session?.email).limit(1).get();
     
     if (userSnapshot.empty) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -82,12 +83,16 @@ export async function POST(request: NextRequest) {
     
     // Ensure the user can only delegate energy to their own address
     if (userData.tron_address !== address) {
-      logger.warn(`[Tron Energy API] User ${session.email} attempted to delegate energy to unowned address ${address}`);
+      logger.warn(`[Tron Energy API] User ${session?.email} attempted to delegate energy to unowned address ${address}`);
       return NextResponse.json({ error: 'You can only delegate energy to your own wallet' }, { status: 403 });
     }
     
     // Check rate limit (1 delegation per 24 hours)
-    if (!canDelegateEnergy(session.userId)) {
+    if (!session) {
+      return NextResponse.json({ error: 'Session required' }, { status: 401 });
+    }
+    
+    if (!canDelegateEnergy(session.userId || '')) {
       return NextResponse.json({ 
         error: 'Rate limit exceeded',
         message: 'You can only request energy delegation once every 24 hours'
