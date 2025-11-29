@@ -50,7 +50,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<{ success:
   }
 }
 
-export async function verifyAdminSession(request: NextRequest): Promise<{ success: boolean; email?: string; error?: string }> {
+export async function verifyAdminSession(request: NextRequest): Promise<{ success: boolean; email?: string; adminId?: string; error?: string }> {
   try {
     const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -58,36 +58,59 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const deviceFingerprint = request.headers.get('x-device-fingerprint');
+    const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
     
-    // First try to validate as admin session token
+    // SECURITY: Admin sessions MUST have device fingerprint
+    if (!deviceFingerprint) {
+      console.error('Admin access attempt without device fingerprint', { ip: ipAddress });
+      return { success: false, error: 'Device fingerprint required for admin access' };
+    }
+    
+    // First try to validate as admin session token (from OTP-based auth)
     try {
       const sessionData = await AdminSessionManager.validateAdminSession(token);
       if (sessionData && sessionData.email) {
+        // CRITICAL: Verify device fingerprint matches
+        if (sessionData.deviceFingerprint !== deviceFingerprint) {
+          console.error('Device fingerprint mismatch for admin session', {
+            email: sessionData.email,
+            expectedFingerprint: sessionData.deviceFingerprint,
+            providedFingerprint: deviceFingerprint,
+            ip: ipAddress
+          });
+          return { success: false, error: 'Device verification failed - session invalid' };
+        }
+        
         // Check if email is still in admin whitelist
         if (!ADMIN_EMAILS.includes(sessionData.email)) {
           return { success: false, error: 'Email no longer authorized for admin access' };
         }
-        return { success: true, email: sessionData.email };
+        
+        // Verify this is an actual admin session (created via OTP auth)
+        if (!sessionData.role || sessionData.role !== 'admin') {
+          console.error('Non-admin role attempting admin access', { 
+            email: sessionData.email,
+            role: sessionData.role 
+          });
+          return { success: false, error: 'Admin role required' };
+        }
+        
+        return { 
+          success: true, 
+          email: sessionData.email,
+          adminId: sessionData.adminId
+        };
       }
     } catch (sessionError) {
-      // If session validation fails, fall back to Firebase token validation
+      console.error('Admin session validation failed:', sessionError);
     }
     
-    // Fall back to Firebase token verification for backward compatibility
-    const auth = getAuth();
-    const decodedToken = await auth.verifyIdToken(token);
-    const email = decodedToken.email;
-
-    if (!email) {
-      return { success: false, error: 'No email found in token' };
-    }
-
-    // Check if email is in admin whitelist
-    if (!ADMIN_EMAILS.includes(email)) {
-      return { success: false, error: 'Email not authorized for admin access' };
-    }
-
-    return { success: true, email };
+    // NO FALLBACK - Admin must use proper OTP-based authentication
+    return { 
+      success: false, 
+      error: 'Valid admin session required. Please login through admin panel with OTP verification.' 
+    };
   } catch (error) {
     console.error('Admin session verification error:', error);
     return { success: false, error: 'Session verification failed' };

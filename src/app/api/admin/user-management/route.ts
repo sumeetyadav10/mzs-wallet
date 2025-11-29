@@ -24,10 +24,21 @@ export async function GET(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin user-management GET access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
-    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+    return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access
+  logger.log('✅ Admin user-management GET accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'get_user'
+  });
 
   const { searchParams } = new URL(request.url);
   const docId = searchParams.get('docId');
@@ -64,10 +75,21 @@ export async function PUT(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin user-management PUT access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
-    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+    return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access
+  logger.log('✅ Admin user-management PUT accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'update_user'
+  });
 
   try {
     const { docId, updates, adminAction } = await request.json();
@@ -80,23 +102,30 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Updates required' }, { status: 400 });
     }
 
-    // Add admin audit trail
+    // Add admin audit trail with device info
     const auditData = {
       ...updates,
       lastModifiedBy: authResult.email,
+      lastModifiedByAdminId: authResult.adminId,
       lastModifiedAt: new Date().toISOString(),
+      lastModifiedFromIP: request.headers.get('x-forwarded-for') || 'unknown',
+      lastModifiedDevice: request.headers.get('x-device-fingerprint') || 'unknown',
       adminAction: adminAction || 'field_update'
     };
 
     await db.collection('users').doc(docId).update(auditData);
 
-    // Log the action
+    // Log the action with device info
     await db.collection('admin_logs').add({
       action: 'user_update',
       adminEmail: authResult.email,
+      adminId: authResult.adminId,
       targetDocId: docId,
       updates: Object.keys(updates),
       timestamp: new Date().toISOString(),
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
       adminAction
     });
 
@@ -118,10 +147,21 @@ export async function DELETE(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin user-management DELETE access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
-    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+    return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access - CRITICAL ACTION
+  logger.warn('⚠️ Admin user-management DELETE accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'delete_user_request'
+  });
 
   try {
     const { docId, fieldsToDelete, deleteEntireDoc, confirmationCode } = await request.json();
@@ -139,12 +179,17 @@ export async function DELETE(request: NextRequest) {
       // Delete entire document
       await db.collection('users').doc(docId).delete();
 
-      // Log the action
+      // Log the action with device info - CRITICAL
       await db.collection('admin_logs').add({
         action: 'user_delete_complete',
         adminEmail: authResult.email,
+        adminId: authResult.adminId,
         targetDocId: docId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        deviceFingerprint: request.headers.get('x-device-fingerprint') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        severity: 'CRITICAL'
       });
 
       return NextResponse.json({ 
@@ -167,13 +212,18 @@ export async function DELETE(request: NextRequest) {
 
       await db.collection('users').doc(docId).update(updates);
 
-      // Log the action
+      // Log the action with device info
       await db.collection('admin_logs').add({
         action: 'user_fields_delete',
         adminEmail: authResult.email,
+        adminId: authResult.adminId,
         targetDocId: docId,
         deletedFields: fieldsToDelete,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+        deviceFingerprint: request.headers.get('x-device-fingerprint') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        severity: 'HIGH'
       });
 
       return NextResponse.json({ 

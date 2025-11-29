@@ -24,10 +24,22 @@ export async function POST(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin recovery approval attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
     return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log CRITICAL admin action
+  logger.warn('⚠️ Admin recovery approval accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'approve_recovery_request',
+    severity: 'CRITICAL'
+  });
   try {
     const { requestId } = await request.json();
     if (!requestId) {
@@ -51,9 +63,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     const userRef = userQuery.docs[0].ref;
-    await userRef.update({ password_hash: reqData.password_hash });
+    await userRef.update({ 
+      password_hash: reqData.password_hash,
+      password_reset_by_admin: authResult.email,
+      password_reset_by_admin_id: authResult.adminId,
+      password_reset_at: new Date().toISOString(),
+      password_reset_from_ip: request.headers.get('x-forwarded-for') || 'unknown'
+    });
     // Mark request as approved
-    await reqDoc.ref.update({ status: 'approved', adminActionAt: new Date().toISOString() });
+    await reqDoc.ref.update({ 
+      status: 'approved', 
+      adminActionAt: new Date().toISOString(),
+      approvedBy: authResult.email,
+      approvedByAdminId: authResult.adminId,
+      approvedFromIP: request.headers.get('x-forwarded-for') || 'unknown',
+      approvedWithDevice: request.headers.get('x-device-fingerprint') || 'unknown'
+    });
+    
+    // Log critical admin action
+    await db.collection('admin_logs').add({
+      action: 'password_recovery_approved',
+      adminEmail: authResult.email,
+      adminId: authResult.adminId,
+      targetUserId: reqData.userId,
+      requestId: requestId,
+      timestamp: new Date().toISOString(),
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      severity: 'CRITICAL'
+    });
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

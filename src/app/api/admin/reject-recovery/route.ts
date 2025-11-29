@@ -24,10 +24,22 @@ export async function POST(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin recovery rejection attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
     return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log admin action
+  logger.log('⚠️ Admin recovery rejection accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'reject_recovery_request'
+  });
+  
   try {
     const { requestId } = await request.json();
     if (!requestId) {
@@ -46,7 +58,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Request already processed' }, { status: 400 });
     }
     // Mark request as rejected
-    await reqDoc.ref.update({ status: 'rejected', adminActionAt: new Date().toISOString() });
+    await reqDoc.ref.update({ 
+      status: 'rejected', 
+      adminActionAt: new Date().toISOString(),
+      rejectedBy: authResult.email,
+      rejectedByAdminId: authResult.adminId,
+      rejectedFromIP: request.headers.get('x-forwarded-for') || 'unknown',
+      rejectedWithDevice: request.headers.get('x-device-fingerprint') || 'unknown'
+    });
+    
+    // Log admin action
+    await db.collection('admin_logs').add({
+      action: 'password_recovery_rejected',
+      adminEmail: authResult.email,
+      adminId: authResult.adminId,
+      targetUserId: reqData.userId,
+      requestId: requestId,
+      timestamp: new Date().toISOString(),
+      ipAddress: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown',
+      severity: 'HIGH'
+    });
+    
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

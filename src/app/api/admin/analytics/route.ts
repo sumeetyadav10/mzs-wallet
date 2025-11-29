@@ -23,10 +23,21 @@ export async function GET(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin analytics access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
-    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+    return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access
+  logger.log('✅ Admin analytics API accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'view_analytics'
+  });
 
   try {
     logger.log('Generating admin analytics...');

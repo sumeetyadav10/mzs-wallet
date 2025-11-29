@@ -19,15 +19,26 @@ const db = getFirestore();
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
-  // Verify admin authentication
+  // Verify admin authentication with device fingerprint
   const authResult = await verifyAdminSession(request);
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin search-users access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
-    return NextResponse.json({ error: 'Admin session required' }, { status: 403 });
+    return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access
+  logger.log('✅ Admin search API accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'search_users'
+  });
 
   try {
     const { searchTerm, searchFields, limit = 50 } = await request.json();

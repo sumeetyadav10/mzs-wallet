@@ -29,10 +29,21 @@ export async function GET(request: NextRequest) {
   if (!authResult.success) {
     logger.warn('🚨 Unauthorized admin recovery requests access attempt', {
       error: authResult.error,
-      ip: request.headers.get('x-forwarded-for') || 'unknown'
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      deviceFingerprint: request.headers.get('x-device-fingerprint') || 'missing',
+      userAgent: request.headers.get('user-agent') || 'unknown'
     });
     return NextResponse.json({ error: authResult.error || 'Admin session required' }, { status: 403 });
   }
+  
+  // Log successful admin access
+  logger.log('✅ Admin recovery-requests API accessed', {
+    adminEmail: authResult.email,
+    adminId: authResult.adminId,
+    ip: request.headers.get('x-forwarded-for') || 'unknown',
+    deviceFingerprint: request.headers.get('x-device-fingerprint'),
+    action: 'view_recovery_requests'
+  });
 
   // Rate limiting by user email
   const userEmail = authResult.email!;
