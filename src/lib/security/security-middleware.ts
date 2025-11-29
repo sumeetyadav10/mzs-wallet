@@ -104,6 +104,15 @@ export const securityMiddleware = {
         return { success: false, error: 'CAPTCHA configuration error' };
       }
 
+      // Debug logging
+      logger.info('🔍 CAPTCHA Debug - Sending verification request', {
+        tokenLength: captchaToken.length,
+        tokenPreview: captchaToken.substring(0, 20) + '...',
+        secretKeyExists: !!secretKey,
+        secretKeyPreview: secretKey.substring(0, 10) + '...',
+        action
+      });
+
       const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
         method: 'POST',
         headers: {
@@ -114,13 +123,25 @@ export const securityMiddleware = {
 
       const data = await response.json();
       
+      // Debug logging
+      logger.info('🔍 CAPTCHA Debug - Google response', {
+        success: data.success,
+        errorCodes: data['error-codes'],
+        hostname: data.hostname,
+        challengeTs: data.challenge_ts,
+        apkPackageName: data.apk_package_name,
+        action
+      });
+      
       if (data.success) {
         logger.info('CAPTCHA verification successful', { action });
         return { success: true };
       } else {
         logger.warn('CAPTCHA verification failed', { 
           errors: data['error-codes'], 
-          action 
+          action,
+          hostname: data.hostname,
+          fullResponse: data
         });
         return { success: false, error: 'CAPTCHA verification failed' };
       }
