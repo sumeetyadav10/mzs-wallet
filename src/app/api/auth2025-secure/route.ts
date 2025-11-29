@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     const sessionResult = await SecureSessionManager.createSecureSession({
       web3AuthIdToken: 'mzs_enhanced_auth', // Placeholder for MZS enhanced auth
       verifiedUserData: {
-        uid: userDoc.id,
+        userId: userDoc.id || user_id, // This is what SecureSessionManager expects
         email: user_id,
         name: userData.name || user_id
       },
