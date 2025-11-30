@@ -21,6 +21,25 @@ export const securityMiddleware = {
   validateOrigin(request: NextRequest): boolean {
     const origin = request.headers.get('origin');
     const referer = request.headers.get('referer');
+    const clientType = request.headers.get('x-client-type');
+    
+    // Allow mobile apps (they don't have origin)
+    if (clientType === 'mobile-app') {
+      const deviceFingerprint = request.headers.get('x-device-fingerprint');
+      if (deviceFingerprint) {
+        logger.log('✅ Mobile app request validated', { 
+          deviceFingerprint: deviceFingerprint.substring(0, 50) + '...', 
+          userAgent: request.headers.get('user-agent'),
+          ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+        });
+        return true;
+      } else {
+        logger.warn('Mobile app request missing device fingerprint', {
+          userAgent: request.headers.get('user-agent'),
+          ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+        });
+      }
+    }
     
     // Allow localhost for development
     if (process.env.NODE_ENV === 'development') {
@@ -59,6 +78,7 @@ export const securityMiddleware = {
     logger.warn('Unauthorized origin detected', {
       origin,
       referer,
+      clientType,
       userAgent: request.headers.get('user-agent'),
       ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
     });
