@@ -49,97 +49,98 @@ export async function POST(request: NextRequest) {
 
     logger.log(`Admin search: "${searchTerm}" in fields: ${searchFields?.join(', ') || 'all'}`);
 
-    // Default searchable fields
+    // ONLY search in mzs collection with indexed fields
     const defaultFields = [
       'user_id', 
       'auth_email', 
-      'address', 
       'email',
-      'created_at',
-      'migratedAt'
+      'wallet_address'
     ];
 
     const fieldsToSearch = searchFields || defaultFields;
     const results: any[] = [];
     const searchedQueries: string[] = [];
+    const processedDocIds = new Set<string>();
 
-    // Search exact matches for each field
+    // Search exact matches for each field in mzs collection only
     for (const field of fieldsToSearch) {
       try {
-        const query = db.collection('users')
+        // IMPORTANT: Only query mzs collection with indexed fields
+        const query = db.collection('mzs')
           .where(field, '==', searchTerm)
           .limit(limit);
         
         const snapshot = await query.get();
-        searchedQueries.push(`${field} == "${searchTerm}"`);
+        searchedQueries.push(`mzs.${field} == "${searchTerm}"`);
 
         snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          // Remove sensitive fields for display
-          const sanitizedData = { ...data };
-          delete sanitizedData.private_key;
-          delete sanitizedData.password_hash;
-          
-          // Add match info
-          const result = {
-            docId: doc.id,
-            matchedField: field,
-            matchedValue: searchTerm,
-            ...sanitizedData
-          };
-          
-          // Avoid duplicates
-          if (!results.find(r => r.docId === doc.id)) {
+          if (!processedDocIds.has(doc.id)) {
+            processedDocIds.add(doc.id);
+            const data = doc.data();
+            // Remove sensitive fields for display
+            const sanitizedData = { ...data };
+            delete sanitizedData.private_key;
+            
+            // Add match info
+            const result = {
+              docId: doc.id,
+              matchedField: field,
+              matchedValue: searchTerm,
+              matchType: 'exact',
+              ...sanitizedData
+            };
+            
             results.push(result);
           }
         });
-             } catch (error: any) {
-         logger.log(`Search failed for field ${field}:`, error?.message || error);
-         // Continue with other fields
-       }
+      } catch (error: any) {
+        logger.log(`Search failed for mzs.${field}:`, error?.message || error);
+        // Continue with other fields
+      }
     }
 
-    // If no exact matches, try partial/fuzzy matching on text fields
-    if (results.length === 0) {
-      const textFields = ['user_id', 'auth_email', 'address'];
+    // If no exact matches and searchTerm is long enough, try prefix matching on indexed fields
+    if (results.length === 0 && searchTerm.length >= 3) {
+      // Only do prefix matching for user_id and auth_email to minimize reads
+      const prefixFields = ['user_id', 'auth_email'];
       
-      for (const field of textFields) {
-        try {
-          // Get all documents and filter client-side for partial matches
-          const allDocsQuery = db.collection('users').limit(1000);
-          const snapshot = await allDocsQuery.get();
-          
-          snapshot.docs.forEach(doc => {
-            const data = doc.data();
-            const fieldValue = data[field];
+      for (const field of prefixFields) {
+        if (!fieldsToSearch || fieldsToSearch.includes(field)) {
+          try {
+            // Use Firestore range queries for prefix matching (indexed)
+            const startValue = searchTerm;
+            const endValue = searchTerm + '\uf8ff'; // Unicode character to ensure we get all prefixes
             
-            if (fieldValue && typeof fieldValue === 'string') {
-              const isPartialMatch = fieldValue.toLowerCase().includes(searchTerm.toLowerCase());
-              
-              if (isPartialMatch) {
+            const query = db.collection('mzs')
+              .where(field, '>=', startValue)
+              .where(field, '<', endValue)
+              .limit(limit - results.length);
+            
+            const snapshot = await query.get();
+            searchedQueries.push(`mzs.${field} prefix "${searchTerm}"`);
+            
+            snapshot.docs.forEach(doc => {
+              if (!processedDocIds.has(doc.id)) {
+                processedDocIds.add(doc.id);
+                const data = doc.data();
                 const sanitizedData = { ...data };
                 delete sanitizedData.private_key;
-                delete sanitizedData.password_hash;
                 
                 const result = {
                   docId: doc.id,
                   matchedField: field,
-                  matchedValue: fieldValue,
+                  matchedValue: data[field],
                   matchType: 'partial',
                   ...sanitizedData
                 };
                 
-                if (!results.find(r => r.docId === doc.id)) {
-                  results.push(result);
-                }
+                results.push(result);
               }
-            }
-          });
-          
-          searchedQueries.push(`${field} contains "${searchTerm}" (partial)`);
-                 } catch (error: any) {
-           logger.log(`Partial search failed for field ${field}:`, error?.message || error);
-         }
+            });
+          } catch (error: any) {
+            logger.log(`Prefix search failed for mzs.${field}:`, error?.message || error);
+          }
+        }
       }
     }
 

@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 🔐 CRITICAL: Use session email only (NO user input for email)
-    const userQuery = await db.collection('users').where('auth_email', '==', session.email).limit(1).get();
+    const userQuery = await db.collection('mzs').where('auth_email', '==', session.email).limit(1).get();
     if (userQuery.empty) {
       SecAudit.logCriticalAccess({
         type: 'AUTH_FAIL',

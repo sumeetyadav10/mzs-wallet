@@ -10,9 +10,12 @@ interface SearchResult {
   matchType?: 'exact' | 'partial';
   user_id?: string;
   auth_email?: string;
+  email?: string;
+  wallet_address?: string;
   address?: string;
   created_at?: string;
   migratedAt?: string;
+  migrated?: boolean;
   [key: string]: any;
 }
 
@@ -23,8 +26,10 @@ interface SuperSearchProps {
 const SEARCH_FIELDS = [
   { value: '', label: '전체 필드' },
   { value: 'user_id', label: '사용자 ID' },
-  { value: 'auth_email', label: '이메일' },
-  { value: 'address', label: '지갑 주소' }
+  { value: 'auth_email', label: '인증 이메일' },
+  { value: 'email', label: '이메일' },
+  { value: 'wallet_address', label: '지갑 주소' },
+  { value: 'address', label: '주소' }
 ];
 
 export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
@@ -107,7 +112,7 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
       }
     }
     
-    if (field === 'address' && typeof value === 'string' && value.length > 10) {
+    if ((field === 'address' || field === 'wallet_address') && typeof value === 'string' && value.length > 10) {
       return `${value.slice(0, 6)}...${value.slice(-4)}`;
     }
     
@@ -135,7 +140,7 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="사용자 검색... (최소 2자)"
+            placeholder="MZS 사용자 검색... (최소 2자)"
             className="glass w-full px-4 py-2 pl-10 pr-10 rounded-xl border border-[var(--golf-gold)]/30 text-[var(--golf-dark)] font-semibold focus:ring-2 focus:ring-[var(--golf-gold)]"
           />
           <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--golf-gold)]" />
@@ -170,7 +175,7 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
           ) : (
             <div className="p-2">
               <div className="text-xs text-[var(--golf-dark)]/60 mb-2 px-2">
-                {results.length}개의 결과 발견
+                MZS 컬렉션에서 {results.length}개의 결과 발견
               </div>
               {results.map((user) => (
                 <button
@@ -202,13 +207,25 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
                           {user.matchField === 'auth_email' && user.auth_email && (
                             <span className="ml-2 font-mono">"{user.auth_email}"</span>
                           )}
+                          {user.matchField === 'email' && user.email && (
+                            <span className="ml-2 font-mono">"{user.email}"</span>
+                          )}
+                          {user.matchField === 'wallet_address' && user.wallet_address && (
+                            <span className="ml-2 font-mono text-xs">"{formatFieldValue(user.wallet_address, 'wallet_address')}"</span>
+                          )}
                           {user.matchField === 'address' && user.address && (
                             <span className="ml-2 font-mono text-xs">"{formatFieldValue(user.address, 'address')}"</span>
                           )}
                         </div>
                         <div className="grid grid-cols-1 gap-1">
                           {user.auth_email && user.matchField !== 'auth_email' && (
-                            <div>이메일: <span className="font-medium">{user.auth_email}</span></div>
+                            <div>인증 이메일: <span className="font-medium">{user.auth_email}</span></div>
+                          )}
+                          {user.email && user.matchField !== 'email' && (
+                            <div>이메일: <span className="font-medium">{user.email}</span></div>
+                          )}
+                          {user.wallet_address && user.matchField !== 'wallet_address' && (
+                            <div>지갑 주소: <span className="font-mono text-xs">{formatFieldValue(user.wallet_address, 'wallet_address')}</span></div>
                           )}
                           {user.address && user.matchField !== 'address' && (
                             <div>주소: <span className="font-mono text-xs">{formatFieldValue(user.address, 'address')}</span></div>
@@ -216,8 +233,8 @@ export default function SuperSearch({ onUserSelect }: SuperSearchProps) {
                           {user.created_at && (
                             <div>생성일: <span className="font-medium">{formatFieldValue(user.created_at, 'created_at')}</span></div>
                           )}
-                          {user.migratedAt && (
-                            <div>마이그레이션: <span className="font-medium">{formatFieldValue(user.migratedAt, 'migratedAt')}</span></div>
+                          {user.migrated !== undefined && (
+                            <div>마이그레이션: <span className="font-medium">{user.migrated ? '완료' : '미완료'}</span></div>
                           )}
                         </div>
                       </div>

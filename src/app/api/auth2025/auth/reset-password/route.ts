@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    const userQuery = await db.collection('users').where('user_id', '==', user_id).limit(1).get();
+    const userQuery = await db.collection('mzs').where('user_id', '==', user_id).limit(1).get();
     if (userQuery.empty) {
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',

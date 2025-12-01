@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         sessionResult = await SecureSessionManager.createSecureSession({
           web3AuthIdToken: web3AuthToken,
           verifiedUserData: {
-            uid: tokenPayload.email || tokenPayload.sub || email, // Web3Auth uses email as uid
+            uid: email, // Use email as uid for MZS wallet users
             email: email,
             name: tokenPayload.name || email
           },
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
       const walletAddress = wallet.address;
 
       // Store wallet with enhanced security for MZS
-      const userRef = db.collection('users').doc(email);
+      const userRef = db.collection('mzs').doc(email);
       await userRef.set({
         auth_email: email,
         private_key: private_key, // Store raw private key for wallet import
@@ -274,15 +274,19 @@ export async function POST(request: NextRequest) {
 
     // Wallet retrieval flow for MZS wallet
     let userQuery;
+    let userDoc;
+    let userData;
+    
     try {
-      logger.log('🔍 Querying Firestore for user:', { email });
+      // ONLY check mzs collection for MZS wallet users
+      logger.log('🔍 Querying Firestore mzs collection for:', { email });
       userQuery = await db
-        .collection('users')
+        .collection('mzs')
         .where('auth_email', '==', email)
         .limit(1)
         .get();
       
-      logger.log('✅ Firestore query successful', { 
+      logger.log('✅ mzs collection query result', { 
         isEmpty: userQuery.empty,
         docCount: userQuery.docs.length 
       });
@@ -305,15 +309,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (userQuery.empty) {
-      logger.log('⚠️ User not found in Firestore:', { email });
+      logger.log('⚠️ User not found in mzs collection:', { email });
       return NextResponse.json(
         { error: 'MZS Wallet user not found' },
         { status: 404 }
       );
     }
 
-    const userDoc = userQuery.docs[0];
-    const userData = userDoc.data();
+    userDoc = userQuery.docs[0];
+    userData = userDoc.data();
 
     if (!userData || !userData.private_key) {
       return NextResponse.json(

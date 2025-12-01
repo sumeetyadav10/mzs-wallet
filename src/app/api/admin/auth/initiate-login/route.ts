@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // 1. Verify admin credentials in MZS database
     const adminQuery = await db
-      .collection('users')
+      .collection('mzs')
       .where('auth_email', '==', email)
       .where('role', '==', 'admin')
       .limit(1)
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (adminQuery.empty) {
       // Check if user exists but is not admin
       const userQuery = await db
-        .collection('users')
+        .collection('mzs')
         .where('auth_email', '==', email)
         .limit(1)
         .get();

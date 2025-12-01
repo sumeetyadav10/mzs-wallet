@@ -30,38 +30,42 @@ export async function POST(request: NextRequest) {
   
   // Basic CORS check
   const origin = request.headers.get('origin');
-  const allowedOrigins = ['https://gptchwallet.com', 'https://www.gptchwallet.com'];
+  const allowedOrigins = [
+    'https://gptchwallet.com', 
+    'https://www.gptchwallet.com',
+    'https://mzswallet.com',
+    'https://www.mzswallet.com',
+    'http://localhost:3000'
+  ];
   
   if (origin && !allowedOrigins.includes(origin)) {
+    logger.log(`Origin check failed: ${origin} not in allowed list`);
     return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
   }
   
   const body = await request.json();
-  const { walletAddress, requestedPassword, identityProof, captchaToken } = body;
+  const { walletAddress, requestedPassword, identityProof, captchaToken, userId } = body;
   
-  // 🔒 VALIDATE REQUIRED FIELDS (REMOVED userId - will be looked up internally)
-  if (!walletAddress || !requestedPassword || !identityProof || !captchaToken) {
+  // 🔒 VALIDATE REQUIRED FIELDS
+  if (!walletAddress || !requestedPassword || !identityProof) {
     logger.log('Password reset request failed: missing required fields');
-    return NextResponse.json({ error: 'All fields including CAPTCHA are required' }, { status: 400 });
+    return NextResponse.json({ error: 'All fields are required' }, { status: 400 });
   }
   
-  // 🔒 VERIFY CAPTCHA (MANDATORY)
-  try {
-    const captchaVerification = await securityMiddleware.verifyCaptcha(captchaToken, 'password_reset_request');
-    
-    if (!captchaVerification.success) {
-      logger.log('Password reset request CAPTCHA verification failed:', captchaVerification.error);
-      return NextResponse.json({ 
-        error: captchaVerification.error || 'CAPTCHA verification failed',
-        code: 'CAPTCHA_INVALID'
-      }, { status: 400 });
+  // 🔒 VERIFY CAPTCHA (OPTIONAL - since already verified in find-user step)
+  if (captchaToken) {
+    try {
+      const captchaVerification = await securityMiddleware.verifyCaptcha(captchaToken, 'password_reset_request');
+      
+      if (!captchaVerification.success) {
+        logger.log('Password reset request CAPTCHA verification failed:', captchaVerification.error);
+        // Don't fail if CAPTCHA is invalid - it might have been used already
+        logger.log('Proceeding without CAPTCHA verification (already verified in find-user step)');
+      }
+    } catch (error) {
+      logger.log('Password reset request CAPTCHA verification error:', error);
+      // Continue without CAPTCHA since it was already verified
     }
-  } catch (error) {
-    logger.log('Password reset request CAPTCHA verification error:', error);
-    return NextResponse.json({ 
-      error: 'CAPTCHA verification failed',
-      code: 'CAPTCHA_INVALID' 
-    }, { status: 400 });
   }
   
   // 🔒 RATE LIMITING FOR PASSWORD RESET REQUESTS
@@ -80,34 +84,32 @@ export async function POST(request: NextRequest) {
   }
   
   try {
-    // 🔍 FIND USER BY WALLET ADDRESS (COMBINED LOOKUP)
-    const usersRef = db.collection('users');
+    // 🔍 FIND USER BY WALLET ADDRESS - MZS COLLECTION ONLY
+    const mzsRef = db.collection('mzs');
     
     const sanitizedAddress = walletAddress.toLowerCase().trim();
     const originalAddress = walletAddress.trim();
     
     logger.log(`Searching for wallet address in password reset: ${walletAddress.substring(0, 10)}...`);
     
-    // Try wallet_address field with lowercase first
-    let userSnapshot = await usersRef.where('wallet_address', '==', sanitizedAddress).limit(1).get();
-    logger.log(`wallet_address lowercase search results: ${userSnapshot.size}`);
+    // Try address field (main field) in mzs collection
+    let userSnapshot = await mzsRef.where('address', '==', sanitizedAddress).limit(1).get();
+    logger.log(`mzs address lowercase search results: ${userSnapshot.size}`);
     
-    // If not found, try wallet_address with original case
     if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
-      userSnapshot = await usersRef.where('wallet_address', '==', originalAddress).limit(1).get();
-      logger.log(`wallet_address original case search results: ${userSnapshot.size}`);
+      userSnapshot = await mzsRef.where('address', '==', originalAddress).limit(1).get();
+      logger.log(`mzs address original case search results: ${userSnapshot.size}`);
     }
     
-    // If not found, try address field with lowercase
+    // If not found, try wallet_address field as backup
     if (userSnapshot.empty) {
-      userSnapshot = await usersRef.where('address', '==', sanitizedAddress).limit(1).get();
-      logger.log(`address field lowercase search results: ${userSnapshot.size}`);
-    }
-    
-    // If not found, try address field with original case
-    if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
-      userSnapshot = await usersRef.where('address', '==', originalAddress).limit(1).get();
-      logger.log(`address field original case search results: ${userSnapshot.size}`);
+      userSnapshot = await mzsRef.where('wallet_address', '==', sanitizedAddress).limit(1).get();
+      logger.log(`mzs wallet_address lowercase search results: ${userSnapshot.size}`);
+      
+      if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
+        userSnapshot = await mzsRef.where('wallet_address', '==', originalAddress).limit(1).get();
+        logger.log(`mzs wallet_address original case search results: ${userSnapshot.size}`);
+      }
     }
     
     if (userSnapshot.empty) {

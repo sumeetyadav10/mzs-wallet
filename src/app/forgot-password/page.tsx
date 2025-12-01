@@ -60,7 +60,7 @@ export default function ForgotPassword() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "사용자를 찾을 수 없습니다");
       setUserId(data.user_id);
-      // Submit password reset request with CAPTCHA token
+      // Submit password reset request (CAPTCHA already verified in find-user step)
       const reqRes = await fetch("/api/auth2025/auth/request-password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -69,7 +69,7 @@ export default function ForgotPassword() {
           userId: data.user_id,
           requestedPassword: newPassword,
           identityProof,
-          captchaToken: token, // Include CAPTCHA token for backend verification
+          // Don't send the same CAPTCHA token - it's already been used
         }),
       });
       const reqData = await reqRes.json();

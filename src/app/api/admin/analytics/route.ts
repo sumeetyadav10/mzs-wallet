@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
   try {
     logger.log('Generating admin analytics...');
 
-    // Get all users
-    const usersSnapshot = await db.collection('users').get();
-    const allUsers = usersSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })) as any[];
+    // Get all mzs users
+    const mzsSnapshot = await db.collection('mzs').get();
+    const allUsers = mzsSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })) as any[];
 
     // Deduplicate users by user_id - keep the entry with the most complete data
     const uniqueUsers: any[] = [];

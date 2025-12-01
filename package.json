@@ -17,6 +17,8 @@
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.9",
     "crypto-js": "^4.2.0",
+    "csv-parse": "^6.1.0",
+    "csv-parser": "^3.2.0",
     "dotenv": "^17.0.0",
     "ethers": "^6.11.1",
     "firebase": "^11.9.1",

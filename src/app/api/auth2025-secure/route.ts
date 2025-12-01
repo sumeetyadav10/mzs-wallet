@@ -131,10 +131,27 @@ export async function POST(request: NextRequest) {
     
     logger.log('✅ CAPTCHA verification passed for MZS wallet login');
 
-    // Query user from database
-    const userQuery = await db.collection('users').where('user_id', '==', user_id).limit(1).get();
+    // Query user from database - try by user_id field first
+    const userQuery = await db.collection('mzs').where('user_id', '==', user_id).limit(1).get();
     
+    // If not found by user_id field, try by document ID
+    let userDoc;
     if (userQuery.empty) {
+      logger.log('Not found by user_id field, trying by document ID...');
+      try {
+        const docRef = await db.collection('mzs').doc(user_id).get();
+        if (docRef.exists) {
+          userDoc = docRef;
+          logger.log('User found by document ID');
+        }
+      } catch (e) {
+        logger.log('Error fetching by document ID:', e);
+      }
+    } else {
+      userDoc = userQuery.docs[0];
+    }
+    
+    if (!userDoc) {
       // Log authentication failure for monitoring
       SecAudit.logCriticalAccess({
         type: 'AUTH_FAIL',
@@ -161,8 +178,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const userDoc = userQuery.docs[0];
     const userData = userDoc.data();
+    
+    if (!userData) {
+      logger.log('User data missing');
+      return NextResponse.json(
+        { error: 'User data missing' },
+        { status: 500 }
+      );
+    }
 
     // Verify password
     const isPasswordValid = await compare(password, userData.password_hash);
@@ -232,15 +256,24 @@ export async function POST(request: NextRequest) {
       }
     });
 
+    // Encrypt private key before sending
+    const encryptedPrivateKey = userData.private_key;
+    
     // Create response with secure headers
     const response = NextResponse.json({
-      success: true,
-      message: 'MZS Wallet authentication successful with enhanced security',
+      // New secure token format
+      accessToken: sessionResult.sessionToken,
+      refreshToken: sessionResult.sessionToken, // Using same token for now
+      expiresIn: 24 * 60 * 60,
+      // Keep backward compatibility
       sessionToken: sessionResult.sessionToken,
       sessionData: sessionResult.sessionData,
-      privateKey: userData.private_key, // In production, this should be encrypted
+      private_key: encryptedPrivateKey,
+      encryptedPrivateKey: encryptedPrivateKey, // Add this for login page compatibility
       auth_email: userData.auth_email || null,
+      message: 'MZS Wallet authentication successful with enhanced security',
       isAdmin: userData.role === 'admin' || userData.isAdmin === true,
+      user_id: userDoc.id, // Add user_id for migration flow
       securityInfo: {
         version: '2.0',
         deviceBound: true,

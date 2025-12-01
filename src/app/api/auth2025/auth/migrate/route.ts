@@ -181,8 +181,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. Query for the legacy user by user_id field
-    const legacyUserSnap = await db.collection("users")
+    // 1. Query for the legacy user by user_id field in mzs collection
+    const legacyUserSnap = await db.collection("mzs")
       .where("user_id", "==", legacyUserId)
       .limit(1)
       .get();

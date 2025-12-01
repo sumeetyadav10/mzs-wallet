@@ -69,8 +69,8 @@ export async function POST(request: NextRequest) {
     
     // SECURITY: Verify the user owns this address
     // First, get the user's Tron address from the database
-    const usersRef = db.collection('users');
-    const userSnapshot = await usersRef.where('auth_email', '==', session?.email).limit(1).get();
+    const mzsRef = db.collection('mzs');
+    const userSnapshot = await mzsRef.where('auth_email', '==', session?.email).limit(1).get();
     
     if (userSnapshot.empty) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       // Update Firebase to track delegation
       try {
-        const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('tron_address', '==', address).limit(1).get();
+        const mzsRef = db.collection('mzs');
+        const snapshot = await mzsRef.where('tron_address', '==', address).limit(1).get();
         
         if (!snapshot.empty) {
           const userDoc = snapshot.docs[0];

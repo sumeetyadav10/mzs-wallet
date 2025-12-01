@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Request already processed' }, { status: 400 });
     }
     // Update user password
-    const userQuery = await db.collection('users').where('user_id', '==', reqData.userId).limit(1).get();
+    const userQuery = await db.collection('mzs').where('user_id', '==', reqData.userId).limit(1).get();
     if (userQuery.empty) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }

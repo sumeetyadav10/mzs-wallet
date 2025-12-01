@@ -153,11 +153,28 @@ export async function POST(request: NextRequest) {
     // Sanitize user_id to prevent injection attempts
     const sanitizedUserId = SQLInjectionPrevention.sanitizeInput(user_id, 'user_id');
     
-    // Query user from Firestore
-    const userQuery = await db.collection('users').where('user_id', '==', sanitizedUserId).limit(1).get();
+    // Query user from mzs collection - try by user_id field first
+    let userQuery = await db.collection('mzs').where('user_id', '==', sanitizedUserId).limit(1).get();
     
+    // If not found by user_id field, try by document ID
+    let userDoc;
     if (userQuery.empty) {
-      logger.log('User not found in Firestore');
+      logger.log('Not found by user_id field, trying by document ID...');
+      try {
+        const docRef = await db.collection('mzs').doc(sanitizedUserId).get();
+        if (docRef.exists) {
+          userDoc = docRef;
+          logger.log('User found by document ID');
+        }
+      } catch (e) {
+        logger.log('Error fetching by document ID:', e);
+      }
+    } else {
+      userDoc = userQuery.docs[0];
+    }
+    
+    if (!userDoc) {
+      logger.log('User not found in mzs collection');
       
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
@@ -175,7 +192,6 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const userDoc = userQuery.docs[0];
     const userData = userDoc.data();
     
     logger.log('User data found:', { ...userData, password_hash: '[REDACTED]', private_key: '[REDACTED]' });

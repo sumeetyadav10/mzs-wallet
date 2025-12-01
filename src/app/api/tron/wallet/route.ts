@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
     
     try {
       // Query for user by email
-      const usersRef = db.collection('users');
-      const snapshot = await usersRef.where('auth_email', '==', email).limit(1).get();
+      const mzsRef = db.collection('mzs');
+      const snapshot = await mzsRef.where('auth_email', '==', email).limit(1).get();
       
       if (snapshot.empty) {
         // Try with email as document ID (legacy format)
-        const userDoc = await db.collection('users').doc(email).get();
+        const userDoc = await db.collection('mzs').doc(email).get();
         
         if (!userDoc.exists) {
           logger.error('[Tron Wallet API] User not found:', email);

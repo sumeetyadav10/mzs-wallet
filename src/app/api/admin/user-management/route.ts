@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const doc = await db.collection('users').doc(docId).get();
+    const doc = await db.collection('mzs').doc(docId).get();
     
     if (!doc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest) {
       adminAction: adminAction || 'field_update'
     };
 
-    await db.collection('users').doc(docId).update(auditData);
+    await db.collection('mzs').doc(docId).update(auditData);
 
     // Log the action with device info
     await db.collection('admin_logs').add({
@@ -177,7 +177,7 @@ export async function DELETE(request: NextRequest) {
 
     if (deleteEntireDoc) {
       // Delete entire document
-      await db.collection('users').doc(docId).delete();
+      await db.collection('mzs').doc(docId).delete();
 
       // Log the action with device info - CRITICAL
       await db.collection('admin_logs').add({
@@ -210,7 +210,7 @@ export async function DELETE(request: NextRequest) {
       updates.lastModifiedAt = new Date().toISOString();
       updates.adminAction = 'field_deletion';
 
-      await db.collection('users').doc(docId).update(updates);
+      await db.collection('mzs').doc(docId).update(updates);
 
       // Log the action with device info
       await db.collection('admin_logs').add({

@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
       
       try {
         // First try auth_email field
-        const authEmailQuery = await db.collection('users')
+        const authEmailQuery = await db.collection('mzs')
           .where('auth_email', '==', email)
           .limit(1)
           .get();
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
           existingUser = authEmailQuery.docs[0];
         } else {
           // Try legacy email field as fallback
-          const emailQuery = await db.collection('users')
+          const emailQuery = await db.collection('mzs')
             .where('email', '==', email)
             .limit(1)
             .get();

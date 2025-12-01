@@ -35,9 +35,16 @@ export async function POST(request: NextRequest) {
   
   // Basic CORS check
   const origin = request.headers.get('origin');
-  const allowedOrigins = ['https://gptchwallet.com', 'https://www.gptchwallet.com'];
+  const allowedOrigins = [
+    'https://gptchwallet.com', 
+    'https://www.gptchwallet.com',
+    'https://mzswallet.com',
+    'https://www.mzswallet.com',
+    'http://localhost:3000'
+  ];
   
   if (origin && !allowedOrigins.includes(origin)) {
+    logger.log(`Origin check failed: ${origin} not in allowed list`);
     return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
   }
   
@@ -85,46 +92,39 @@ export async function POST(request: NextRequest) {
   
   try {
     // 🔒 SECURE DATABASE QUERY - Use properly initialized Firebase instance
-    const usersRef = db.collection('users');
+    const mzsRef = db.collection('mzs');
     
-    // Query by wallet_address field - check both lowercase and original case
+    // Query mzs collection ONLY
     const sanitizedAddress = address.toLowerCase().trim();
     const originalAddress = address.trim();
     
-    // 🔍 DEBUG: Log what we're searching for (first 10 chars only for security)
-    logger.log(`Searching for wallet address: ${address.substring(0, 10)}...`);
+    logger.log(`Searching for wallet address in mzs collection: ${address.substring(0, 10)}...`);
     
-    // Try wallet_address field with lowercase first
-    logger.log('Searching wallet_address field (lowercase)...');
-    let userSnapshot = await usersRef.where('wallet_address', '==', sanitizedAddress).limit(1).get();
-    logger.log(`wallet_address lowercase search results: ${userSnapshot.size}`);
+    // Try address field (main field) in mzs collection
+    let userSnapshot = await mzsRef.where('address', '==', sanitizedAddress).limit(1).get();
+    logger.log(`mzs address lowercase search results: ${userSnapshot.size}`);
     
-    // If not found, try wallet_address with original case
     if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
-      logger.log('Searching wallet_address field (original case)...');
-      userSnapshot = await usersRef.where('wallet_address', '==', originalAddress).limit(1).get();
-      logger.log(`wallet_address original case search results: ${userSnapshot.size}`);
+      userSnapshot = await mzsRef.where('address', '==', originalAddress).limit(1).get();
+      logger.log(`mzs address original case search results: ${userSnapshot.size}`);
     }
     
-    // If not found, try address field with lowercase
+    // If not found, try wallet_address field as backup
     if (userSnapshot.empty) {
-      logger.log('Searching address field (lowercase)...');
-      userSnapshot = await usersRef.where('address', '==', sanitizedAddress).limit(1).get();
-      logger.log(`address field lowercase search results: ${userSnapshot.size}`);
-    }
-    
-    // If not found, try address field with original case
-    if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
-      logger.log('Searching address field (original case)...');
-      userSnapshot = await usersRef.where('address', '==', originalAddress).limit(1).get();
-      logger.log(`address field original case search results: ${userSnapshot.size}`);
+      userSnapshot = await mzsRef.where('wallet_address', '==', sanitizedAddress).limit(1).get();
+      logger.log(`mzs wallet_address lowercase search results: ${userSnapshot.size}`);
+      
+      if (userSnapshot.empty && originalAddress !== sanitizedAddress) {
+        userSnapshot = await mzsRef.where('wallet_address', '==', originalAddress).limit(1).get();
+        logger.log(`mzs wallet_address original case search results: ${userSnapshot.size}`);
+      }
     }
     
     // 🔍 DEBUG: Show sample of what addresses exist (without exposing user data)
     if (userSnapshot.empty) {
       logger.log('No match found, checking database connectivity...');
       try {
-        const connectivityTest = await usersRef.limit(1).get();
+        const connectivityTest = await mzsRef.limit(1).get();
         logger.log(`Database connectivity: ${connectivityTest.size > 0 ? 'OK' : 'No data'}`);
       } catch (dbError) {
         logger.error('Firebase connectivity error:', dbError);
