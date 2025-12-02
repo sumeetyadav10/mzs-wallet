@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-12-01T08:34:24.964Z",
+  "totalFailedLogins": 9,
+  "restoredUsers": [
+    {
+      "email": "bless07073@gmail.com",
+      "count": 3
+    },
+    {
+      "email": "a01041837118@gmail.com",
+      "count": 2
+    },
+    {
+      "email": "hjihai@naver.com",
+      "count": 1
+    }
+  ],
+  "unknownUsers": [
+    {
+      "email": "tlsaudgp@gmail.com",
+      "count": 4
+    },
+    {
+      "email": "kimek0463@gmail.com",
+      "count": 3
+    },
+    {
+      "email": "seongtaesin@gmail.com",
+      "count": 2
+    },
+    {
+      "email": "a0103285653664@gmail.com",
+      "count": 2
+    },
+    {
+      "email": "wcyn0097@gmail.com",
+      "count": 1
+    },
+    {
+      "email": "oks8003@gmail.com",
+      "count": 1
+    }
+  ]
+}

@@ -1,0 +1,320 @@
+{
+  "summary": {
+    "total_in_MZS": 61,
+    "already_complete": 0,
+    "newly_migrated": 8,
+    "merged_documents": 53,
+    "errors": 0,
+    "timestamp": "2025-12-01T10:18:51.936Z"
+  },
+  "migrated_documents": [
+    {
+      "doc_id": "01021449097",
+      "auth_email": "namjubag008@gmail.com",
+      "wallet_address": "0x7415e3421b42c9f0a2875f806121e31e5766d9f1"
+    },
+    {
+      "doc_id": "36475520",
+      "auth_email": "waterkks117@gmail.com",
+      "wallet_address": "0x4d35a821fad20aea0c5415a56d9c3051b3a48d31"
+    },
+    {
+      "doc_id": "500231",
+      "auth_email": "ok54094698@gmail.com",
+      "wallet_address": "0x69e04ddbce2c2dfe90b30225aa7f167ecf2064d3"
+    },
+    {
+      "doc_id": "Bless07073@gmail.com",
+      "auth_email": "6119@coway.com",
+      "wallet_address": "0xa89ca3730a60980ac1452851e313c6fd9ea2820b"
+    },
+    {
+      "doc_id": "Kgd1028",
+      "auth_email": "j21449097@gmail.com",
+      "wallet_address": "0x2bbe2b0d02c98548cf72a74069f99b488e834cd6"
+    },
+    {
+      "doc_id": "cnddlf411",
+      "auth_email": "mface1@naver.com",
+      "wallet_address": "0x7f34c19ea580930f70a6f227fadf1b3d51c0217a"
+    },
+    {
+      "doc_id": "f94321@naver.com",
+      "auth_email": "kdk00880077@gmail.com",
+      "wallet_address": "0xdb6d38b513ea10a4b638f597ee1d50c615abb09e"
+    },
+    {
+      "doc_id": "gcvtest",
+      "auth_email": "roie4753@gmail.com",
+      "wallet_address": "0xe232e2adff2fe0b4fd6441bc244e6dd8d9c6cb0c"
+    }
+  ],
+  "merged_documents": [
+    {
+      "doc_id": "010",
+      "fields_added": 11,
+      "auth_email": "ksd6348@gmail.com"
+    },
+    {
+      "doc_id": "010-3931-6441",
+      "fields_added": 9,
+      "auth_email": "psb9738@gmail.com"
+    },
+    {
+      "doc_id": "010-5216-3661",
+      "fields_added": 2,
+      "auth_email": "snlee20101@gmail.com"
+    },
+    {
+      "doc_id": "01025361909",
+      "fields_added": 9,
+      "auth_email": "01025361909@gmail.com"
+    },
+    {
+      "doc_id": "01029124457",
+      "fields_added": 9,
+      "auth_email": "solnhel@hanmail.net"
+    },
+    {
+      "doc_id": "01030460135",
+      "fields_added": 11,
+      "auth_email": "dreamham1018@gmail.com"
+    },
+    {
+      "doc_id": "01032856536",
+      "fields_added": 9,
+      "auth_email": "01032856536@member-zone.com"
+    },
+    {
+      "doc_id": "01033294133",
+      "fields_added": 9,
+      "auth_email": "01033294133@memberzone.io"
+    },
+    {
+      "doc_id": "01034356820",
+      "fields_added": 9,
+      "auth_email": "leeks9212@gmail.com"
+    },
+    {
+      "doc_id": "01034641293",
+      "fields_added": 9,
+      "auth_email": "huiwonbang5@gmail.com"
+    },
+    {
+      "doc_id": "01035170757",
+      "fields_added": 9,
+      "auth_email": "kydwww4@gmail.com"
+    },
+    {
+      "doc_id": "01035493748",
+      "fields_added": 9,
+      "auth_email": "01035493748@mzs.com"
+    },
+    {
+      "doc_id": "01036576888",
+      "fields_added": 9,
+      "auth_email": "kdk00880077@gmail.com"
+    },
+    {
+      "doc_id": "01036809730",
+      "fields_added": 9,
+      "auth_email": "kcoco21@naver.com"
+    },
+    {
+      "doc_id": "01038300060",
+      "fields_added": 9,
+      "auth_email": "01038300060@naver.com"
+    },
+    {
+      "doc_id": "01041332177",
+      "fields_added": 9,
+      "auth_email": "khj34072177@gmail.com"
+    },
+    {
+      "doc_id": "01043383387",
+      "fields_added": 9,
+      "auth_email": "gidoggun@gmail.com"
+    },
+    {
+      "doc_id": "01045272929",
+      "fields_added": 9,
+      "auth_email": "01045272929@naver.com"
+    },
+    {
+      "doc_id": "01052271256",
+      "fields_added": 9,
+      "auth_email": "01052271256@gmail.com"
+    },
+    {
+      "doc_id": "01054002100",
+      "fields_added": 9,
+      "auth_email": "ds@co.co"
+    },
+    {
+      "doc_id": "01055319234",
+      "fields_added": 9,
+      "auth_email": "01055319234@gmail.com"
+    },
+    {
+      "doc_id": "01058234590",
+      "fields_added": 9,
+      "auth_email": "ma80122271@gmail.com"
+    },
+    {
+      "doc_id": "01064309222",
+      "fields_added": 9,
+      "auth_email": "parksangdunk@gmail.com"
+    },
+    {
+      "doc_id": "01066949969",
+      "fields_added": 10,
+      "auth_email": "kdg9775@gmail.com"
+    },
+    {
+      "doc_id": "01071533625",
+      "fields_added": 9,
+      "auth_email": "01071533625@naver.com"
+    },
+    {
+      "doc_id": "01076220898",
+      "fields_added": 9,
+      "auth_email": "01076220898@gmail.com"
+    },
+    {
+      "doc_id": "01079389202",
+      "fields_added": 9,
+      "auth_email": "01079389202@mzs.com"
+    },
+    {
+      "doc_id": "01084477878",
+      "fields_added": 9,
+      "auth_email": "01084477878@memberzone.io"
+    },
+    {
+      "doc_id": "01085207785",
+      "fields_added": 2,
+      "auth_email": "sk01085207785@gmail.com"
+    },
+    {
+      "doc_id": "01090262230",
+      "fields_added": 9,
+      "auth_email": "01090262230@mzs.com"
+    },
+    {
+      "doc_id": "01092474329",
+      "fields_added": 9,
+      "auth_email": "01092474329@naver.com"
+    },
+    {
+      "doc_id": "01094363017",
+      "fields_added": 10,
+      "auth_email": "hdr3017@hanmail.net"
+    },
+    {
+      "doc_id": "01098729272",
+      "fields_added": 9,
+      "auth_email": "bless07073@gmail.com"
+    },
+    {
+      "doc_id": "01098989811",
+      "fields_added": 9,
+      "auth_email": "01098989811@naver.com"
+    },
+    {
+      "doc_id": "0765",
+      "fields_added": 9,
+      "auth_email": "haein2k@naver.com"
+    },
+    {
+      "doc_id": "3425",
+      "fields_added": 2,
+      "auth_email": "a67283425@gmail.com"
+    },
+    {
+      "doc_id": "57737187",
+      "fields_added": 9,
+      "auth_email": "a01057737187@gmail.com"
+    },
+    {
+      "doc_id": "9919",
+      "fields_added": 9,
+      "auth_email": "9919@na.com"
+    },
+    {
+      "doc_id": "bluesea",
+      "fields_added": 9,
+      "auth_email": "zxc013000@gmail.com"
+    },
+    {
+      "doc_id": "d00205",
+      "fields_added": 9,
+      "auth_email": "suckwool@gmail.com"
+    },
+    {
+      "doc_id": "devilsup",
+      "fields_added": 9,
+      "auth_email": "devilsup74@gmail.com"
+    },
+    {
+      "doc_id": "fourbee",
+      "fields_added": 9,
+      "auth_email": "fourbee63@gmail.com"
+    },
+    {
+      "doc_id": "gjsan0141",
+      "fields_added": 9,
+      "auth_email": "a01087948211@gmail.com"
+    },
+    {
+      "doc_id": "hkhstd",
+      "fields_added": 9,
+      "auth_email": "hkhstd1@naver.com"
+    },
+    {
+      "doc_id": "jjs2193",
+      "fields_added": 9,
+      "auth_email": "likejun2193@gmail.com"
+    },
+    {
+      "doc_id": "kokh002",
+      "fields_added": 9,
+      "auth_email": "lover0115144355@gmail.com"
+    },
+    {
+      "doc_id": "ksw6204",
+      "fields_added": 9,
+      "auth_email": "ksw4418@naver.com"
+    },
+    {
+      "doc_id": "mong8428",
+      "fields_added": 9,
+      "auth_email": "mong8418@daum.net"
+    },
+    {
+      "doc_id": "su10161225",
+      "fields_added": 9,
+      "auth_email": "su10161225@gmail.com"
+    },
+    {
+      "doc_id": "suda159",
+      "fields_added": 9,
+      "auth_email": "pey9954@gmail.com"
+    },
+    {
+      "doc_id": "tlfrhkd59",
+      "fields_added": 9,
+      "auth_email": "5917qqq@gmail.com"
+    },
+    {
+      "doc_id": "waterkks",
+      "fields_added": 9,
+      "auth_email": "waterkks117@gmail.com"
+    },
+    {
+      "doc_id": "wjdgjs0318",
+      "fields_added": 9,
+      "auth_email": "hjeong56@gmail.com"
+    }
+  ],
+  "error_documents": []
+}

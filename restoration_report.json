@@ -1,0 +1,340 @@
+{
+  "summary": {
+    "total_checked": 63,
+    "already_exists": 52,
+    "newly_restored": 11,
+    "errors": 0,
+    "timestamp": "2025-12-01T08:28:47.211Z"
+  },
+  "existing_users": [
+    {
+      "user_id": "suda159",
+      "email": "suda159@hotmail.com",
+      "auth_email": "pey9954@gmail.com"
+    },
+    {
+      "user_id": "01054002100",
+      "email": "ds@co.co",
+      "auth_email": "hanmjmj3@hanmail.net"
+    },
+    {
+      "user_id": "01064309222",
+      "email": "parksangdunk@gmail.com",
+      "auth_email": "01090262230a@gmail.com"
+    },
+    {
+      "user_id": "01084477878",
+      "email": "01084477878@memberzone.io",
+      "auth_email": "kim1203hy@gmail.com"
+    },
+    {
+      "user_id": "01098989811",
+      "email": "mface1@naver.com",
+      "auth_email": "ingugsong0@gmail.com"
+    },
+    {
+      "user_id": "01055319234",
+      "email": "01055319234@gmail.com",
+      "auth_email": "brandcho11@gmail.com"
+    },
+    {
+      "user_id": "gjsan0141",
+      "email": "01024812814@memverzone.io",
+      "auth_email": "heyyo2511@gmail.com"
+    },
+    {
+      "user_id": "01036809730",
+      "email": "01036809730@gmail.com",
+      "auth_email": "kcoco21@naver.com"
+    },
+    {
+      "user_id": "01045272929",
+      "email": "01045272929@naver.com",
+      "auth_email": "jskim22929@daum.net"
+    },
+    {
+      "user_id": "01066949969",
+      "email": "kdg9775@gmail.com",
+      "auth_email": "kdg9775@gmail.com"
+    },
+    {
+      "user_id": "01030460135",
+      "email": "askung@hanmail.net",
+      "auth_email": "dreamham1018@gmail.com"
+    },
+    {
+      "user_id": "01076220898",
+      "email": "sidiz8808@hanmail.net",
+      "auth_email": "ch88529004@gmail.com"
+    },
+    {
+      "user_id": "01052271256",
+      "email": "01052271256@gmail.com",
+      "auth_email": "a01052271256@gmail.com"
+    },
+    {
+      "user_id": "0765",
+      "email": "mzs@na.co",
+      "auth_email": "jht26594529@gmail.com"
+    },
+    {
+      "user_id": "01035170757",
+      "email": "01035170757@gmail.com",
+      "auth_email": "kcoco21@naver.com"
+    },
+    {
+      "user_id": "Bless07073@gmail.com",
+      "email": "01031155302@mzs.com",
+      "auth_email": "6119@coway.com"
+    },
+    {
+      "user_id": "01032856536",
+      "email": "01052418381@memberzone.io",
+      "auth_email": "bless07073@gmail.com"
+    },
+    {
+      "user_id": "tlfrhkd59",
+      "email": "jjbok21@hanmail.net",
+      "auth_email": "jjbok21@hanmail.net"
+    },
+    {
+      "user_id": "57737187",
+      "email": "57737187@mzs.com",
+      "auth_email": "kdg9775@gmail.com"
+    },
+    {
+      "user_id": "01029124457",
+      "email": "solnhel@hanmail.net",
+      "auth_email": "km429400@naver.com"
+    },
+    {
+      "user_id": "01036576888",
+      "email": "ycscom@naver.com",
+      "auth_email": "01090262230a@gmail.com"
+    },
+    {
+      "user_id": "01079389202",
+      "email": "sjo6523@gmail.com",
+      "auth_email": "a01041837118@gmail.com"
+    },
+    {
+      "user_id": "01035493748",
+      "email": "01038300060@naver.com",
+      "auth_email": "k38300060@gmail.com"
+    },
+    {
+      "user_id": "01085207785",
+      "email": "a01041837118@gmail.com",
+      "auth_email": "a35906709@gmail.com"
+    },
+    {
+      "user_id": "wjdgjs0318",
+      "email": "wjdgjs0318@naver.com",
+      "auth_email": "kdg9775@gmail.com"
+    },
+    {
+      "user_id": "010-5216-3661",
+      "email": "01030460135@memberz.com",
+      "auth_email": "dreamham1018@gmail.com"
+    },
+    {
+      "user_id": "devilsup",
+      "email": "devilsup@naver.com",
+      "auth_email": "bless07073@gmail.com"
+    },
+    {
+      "user_id": "ksw6204",
+      "email": "ksw4418@naver.com",
+      "auth_email": "kodan6988@gmail.com"
+    },
+    {
+      "user_id": "01092474329",
+      "email": "mzs@na.co",
+      "auth_email": "soo1165@naver.com"
+    },
+    {
+      "user_id": "kokh002",
+      "email": "01071270007@gmail.com",
+      "auth_email": "chokakdal@gmail.com"
+    },
+    {
+      "user_id": "hkhstd",
+      "email": "hkhstd1@naver.com",
+      "auth_email": "ehdals5793@gmail.com"
+    },
+    {
+      "user_id": "3425",
+      "email": "3425@naver.com",
+      "auth_email": "hanmjmj3@hanmail.net"
+    },
+    {
+      "user_id": "01094363017",
+      "email": "hdr3017@hanmail.net",
+      "auth_email": "hdr3017@hanmail.net"
+    },
+    {
+      "user_id": "01034641293",
+      "email": "01034641293@naver.com",
+      "auth_email": "park593400@gmail.com"
+    },
+    {
+      "user_id": "01025361909",
+      "email": "01025361909@gmail.com",
+      "auth_email": "hjihai@naver.com"
+    },
+    {
+      "user_id": "01079389202",
+      "email": "01079389202@mzs.com",
+      "auth_email": "hjp640202@gmail.com"
+    },
+    {
+      "user_id": "fourbee",
+      "email": "01036576888@gmail.com",
+      "auth_email": "jang627445@gmail.com"
+    },
+    {
+      "user_id": "cnddlf411",
+      "email": "63535957@mzs.com",
+      "auth_email": "mface1@naver.com"
+    },
+    {
+      "user_id": "01071533625",
+      "email": "01071533625@naver.com",
+      "auth_email": "mface1@naver.com"
+    },
+    {
+      "user_id": "01058234590",
+      "email": "01045272929@naver.com",
+      "auth_email": "kangyt7023@gmail.com"
+    },
+    {
+      "user_id": "Kgd1028",
+      "email": "21449097@naver.com",
+      "auth_email": "j21449097@gmail.com"
+    },
+    {
+      "user_id": "01021449097",
+      "email": "01035065157@memverzone.io",
+      "auth_email": "namjubag008@gmail.com"
+    },
+    {
+      "user_id": "jjs2193",
+      "email": "01025361909@gmail.com",
+      "auth_email": "a01052271256@gmail.com"
+    },
+    {
+      "user_id": "gcvtest",
+      "email": "wjdgjs0318@naver.com",
+      "auth_email": "roie4753@gmail.com"
+    },
+    {
+      "user_id": "010-3931-6441",
+      "email": "psb9738@naver.com",
+      "auth_email": "maeho114@gmail.com"
+    },
+    {
+      "user_id": "01041332177",
+      "email": "khj34072177@gmail.com",
+      "auth_email": "missuni051938@gmail.com"
+    },
+    {
+      "user_id": "500231",
+      "email": "zmfqo@naver.com",
+      "auth_email": "ok54094698@gmail.com"
+    },
+    {
+      "user_id": "01043383387",
+      "email": "01043383387@gmail.com",
+      "auth_email": "moldhjoss@naver.com"
+    },
+    {
+      "user_id": "01033294133",
+      "email": "01033294133@memberzone.io",
+      "auth_email": "oks8003@naver.com"
+    },
+    {
+      "user_id": "01034356820",
+      "email": "tyressdfg@nate.com",
+      "auth_email": "rladudtn11060@naver.com"
+    },
+    {
+      "user_id": "bluesea",
+      "email": "26407351@naver.com",
+      "auth_email": "pdkr6027@daum.net"
+    },
+    {
+      "user_id": "01085207785",
+      "email": "9919@na.com",
+      "auth_email": "sk01085207785@gmail.com"
+    }
+  ],
+  "restored_users": [
+    {
+      "user_id": "01038300060",
+      "email": "k38300060@gmail.com",
+      "auth_email": "j21449097@gmail.com",
+      "wallet_address": "0xca4550a2d935dcb2ba7b8c21410fffb11a4bc4f0"
+    },
+    {
+      "user_id": "010",
+      "email": "01085507216@naver.com",
+      "auth_email": "ksd6348@gmail.com",
+      "wallet_address": "0x69e0a7d4f3851758696e71cd8e632df58fea0492"
+    },
+    {
+      "user_id": "d00205",
+      "email": "mj201@memberzone.io",
+      "auth_email": "a38847710@gmail.com",
+      "wallet_address": "0xba7a92b7bac83e4f39dcf0479a9e42f0980f26c9"
+    },
+    {
+      "user_id": "01090262230",
+      "email": "01090262230@mzs.com",
+      "auth_email": "jskim22929@daum.net",
+      "wallet_address": "0x91ec52104833d7812c72d1c295e01bfcc330aefe"
+    },
+    {
+      "user_id": "9919",
+      "email": "ksw4418@naver.com",
+      "auth_email": "sk01085207785@gmail.com",
+      "wallet_address": "0x2130d81daed247ebdd228407e66c0395de6ce8d9"
+    },
+    {
+      "user_id": "mong8428",
+      "email": "mong8428@memberzone.io",
+      "auth_email": "seonggeunsun1@gmail.com",
+      "wallet_address": "0x4f580de26675a1e4d8a402b87cda564a7325ee0b"
+    },
+    {
+      "user_id": "waterkks",
+      "email": "waterkks@hanmail.net",
+      "auth_email": "sl0849@hanmail.net",
+      "wallet_address": "0x031d7f42a1009716457438b8f8606aaa4431da53"
+    },
+    {
+      "user_id": "su10161225",
+      "email": "su10161225@naver.com",
+      "auth_email": "kdk00880077@gmail.com",
+      "wallet_address": "0xdb6d38b513ea10a4b638f597ee1d50c615abb09e"
+    },
+    {
+      "user_id": "01098729272",
+      "email": "01098729272@gmail.com",
+      "auth_email": "sook082516@gmail.com",
+      "wallet_address": "0xf730061017cbd1b9171fa58e54f1a3e47efb5578"
+    },
+    {
+      "user_id": "f94321@naver.com",
+      "email": "su10161225@naver.com",
+      "auth_email": "kdk00880077@gmail.com",
+      "wallet_address": "0xdb6d38b513ea10a4b638f597ee1d50c615abb09e"
+    },
+    {
+      "user_id": "36475520",
+      "email": "01036475520@memberzoon.com",
+      "auth_email": "waterkks117@gmail.com",
+      "wallet_address": "0x4d35a821fad20aea0c5415a56d9c3051b3a48d31"
+    }
+  ],
+  "error_users": []
+}

@@ -1,0 +1,10 @@
+
+DELETED USERS COMPLETION SUMMARY
+================================
+Total deleted users processed: 63
+Users with private keys: 63
+Users with password hash: 57
+Users with temp password: 0
+Users with balance data: 0
+
+This file contains ONLY the 63 deleted users with their complete information from MZS1.csv and MZS2.csv.

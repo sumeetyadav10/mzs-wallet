@@ -1,0 +1,57 @@
+MZS WALLET DELETED USERS COMPREHENSIVE REPORT
+Generated: 2025-12-01T08:06:29.041Z
+============================================
+
+TOTAL DELETED USERS FOUND: 66
+
+BREAKDOWN:
+- Users with auth_email: 62
+- Users with wallet address: 65
+- Users with user_id: 65
+- Users with email: 66
+
+TOP AUTH EMAILS:
+  01090262230a@gmail.com: 2 users
+  kdg9775@gmail.com: 2 users
+  bless07073@gmail.com: 2 users
+  dreamham1018@gmail.com: 2 users
+  mface1@naver.com: 2 users
+  a01052271256@gmail.com: 2 users
+  jskim22929@daum.net: 2 users
+  pdkr6027@daum.net: 2 users
+  j21449097@gmail.com: 2 users
+  snlee20101@gmail.com: 2 users
+  kdk00880077@gmail.com: 2 users
+  6119@coway.com: 1 users
+  jjbok21@hanmail.net: 1 users
+  hkw3412@gmail.com: 1 users
+  km429400@naver.com: 1 users
+  a01041837118@gmail.com: 1 users
+  a01087948211@gmail.com: 1 users
+  k38300060@gmail.com: 1 users
+  a35906709@gmail.com: 1 users
+  kss709100@gmail.com: 1 users
+
+TOP DOMAINS:
+  gmail.com: 60 users
+  naver.com: 34 users
+  hanmail.net: 8 users
+  memberzone.io: 6 users
+  mzs.com: 5 users
+  daum.net: 5 users
+  memberz.com: 2 users
+  nate.com: 2 users
+  memberzoon.com: 2 users
+  coway.com: 1 users
+
+SAMPLE ENTRIES:
+User: 01064309222 | Email: parksangdunk@gmail.com | Auth: 01090262230a@gmail.com | Wallet: 0x28d88ac056c72a6dd00653058f000b8be6a96a26
+User: Bless07073@gmail.com | Email: 01031155302@mzs.com | Auth: 6119@coway.com | Wallet: 0xa89ca3730a60980ac1452851e313c6fd9ea2820b
+User: tlfrhkd59 | Email: jjbok21@hanmail.net | Auth: jjbok21@hanmail.net | Wallet: 0x728893ba7ec83f4b4c734450f62236194525b359
+User: 57737187 | Email: 57737187@mzs.com | Auth: kdg9775@gmail.com | Wallet: 0xb2f3007a8e18d5ee170eafbdb7f23837ddd1b0f0
+User: 01032856536 | Email: 01052418381@memberzone.io | Auth: bless07073@gmail.com | Wallet: 0x22821a3182aeb0f67a9708d60d7738a082427afa
+User: 01098989811 | Email: mface1@naver.com | Auth: hkw3412@gmail.com | Wallet: 0xdd71452deba59baebc0f7cd377e8c304ccfb8bc7
+User: 01029124457 | Email: solnhel@hanmail.net | Auth: km429400@naver.com | Wallet: 0x006eafb61c336f62adec7c85051bdd4fd6b416d8
+User: 01036576888 | Email: ycscom@naver.com | Auth: 01090262230a@gmail.com | Wallet: 0x2142cc2049b677e6a5bfd7294cbd7e51173c69e1
+User: 01079389202 | Email: sjo6523@gmail.com | Auth: a01041837118@gmail.com | Wallet: 0x49699586fee6a1bbc6bcbaab055efed57ccc4fc0
+User: gjsan0141 | Email: gjsan0141@memberzone.io | Auth: a01087948211@gmail.com | Wallet: 0xfc794157d84220209b40a710ef832823019f8bc1
