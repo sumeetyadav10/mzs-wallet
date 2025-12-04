@@ -36,7 +36,7 @@ export default function AdminLogin() {
     try {
       const result = await login(email, password);
       
-      if (result.requiresMFA) {
+      if (result.requireMFA) {
         setChallengeId(result.challengeId!);
         setAdminId(result.adminId!);
         setShowOTPModal(true);

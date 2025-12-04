@@ -7,124 +7,12 @@ export class AdminApiError extends Error {
   }
 }
 
-// Device fingerprinting function with graceful fallbacks
-let cachedFingerprint: string | null = null;
-
-const generateDeviceFingerprint = (): string => {
-  // Return cached fingerprint if available
-  if (cachedFingerprint) {
-    return cachedFingerprint;
-  }
-  
-  // Only run on client side to avoid hydration issues
-  if (typeof window === 'undefined') {
-    return 'server-render-placeholder';
-  }
-  
-  const components: string[] = [];
-  
-  // 1. User agent and language (always available)
-  components.push(navigator.userAgent || 'unknown-ua');
-  components.push(navigator.language || 'en');
-  
-  // 2. Screen properties with fallback
-  try {
-    components.push(`${screen.width || 0}x${screen.height || 0}`);
-    components.push(`${screen.colorDepth || 0}`);
-  } catch {
-    components.push('0x0');
-    components.push('0');
-  }
-  
-  // 3. Timezone
-  try {
-    components.push(String(new Date().getTimezoneOffset()));
-  } catch {
-    components.push('0');
-  }
-  
-  // 4. Canvas fingerprint with graceful fallback
-  let canvasData = 'canvas-blocked';
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      // Test if canvas is actually writable
-      ctx.fillStyle = '#f60';
-      ctx.fillRect(125, 1, 62, 20);
-      ctx.fillStyle = '#069';
-      ctx.font = '11pt Arial';
-      ctx.fillText('MZS Admin', 2, 15);
-      
-      // Try to get data URL
-      try {
-        canvasData = canvas.toDataURL().slice(-50);
-      } catch (e) {
-        // Canvas.toDataURL blocked by privacy settings
-        canvasData = 'canvas-read-blocked';
-      }
-    }
-  } catch (e) {
-    // Canvas API completely blocked
-    canvasData = 'canvas-api-blocked';
-  }
-  components.push(canvasData);
-  
-  // 5. Additional entropy from available APIs
-  const entropy: string[] = [];
-  
-  // Hardware concurrency
-  if (navigator.hardwareConcurrency) {
-    entropy.push(`hw:${navigator.hardwareConcurrency}`);
-  }
-  
-  // Device memory (if available)
-  if ('deviceMemory' in navigator) {
-    entropy.push(`mem:${(navigator as any).deviceMemory}`);
-  }
-  
-  // Platform
-  if (navigator.platform) {
-    entropy.push(`plat:${navigator.platform}`);
-  }
-  
-  // Combine all components
-  const rawFingerprint = components.join('|') + '|' + entropy.join(',');
-  
-  // Create hash using available methods
-  try {
-    // Use subtle crypto if available
-    if (window.crypto && window.crypto.subtle) {
-      // For now, use simple base64 encoding
-      // In production, you'd want to use crypto.subtle.digest
-      cachedFingerprint = btoa(rawFingerprint).replace(/[^a-zA-Z0-9]/g, '').slice(0, 50);
-      return cachedFingerprint;
-    }
-  } catch {
-    // Fallback to simple encoding
-  }
-  
-  // Final fallback: simple base64 encoding
-  try {
-    cachedFingerprint = btoa(rawFingerprint).replace(/[^a-zA-Z0-9]/g, '').slice(0, 50);
-    return cachedFingerprint;
-  } catch {
-    // Even btoa failed, use a simple hash
-    let hash = 0;
-    for (let i = 0; i < rawFingerprint.length; i++) {
-      const char = rawFingerprint.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    cachedFingerprint = 'fallback-' + Math.abs(hash).toString(36).padEnd(41, '0').slice(0, 41);
-    return cachedFingerprint;
-  }
-};
+// Device fingerprinting removed - admin sessions are secured through other means
 
 export async function adminRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
     // First check for admin session token (from MFA auth)
-    const sessionToken = localStorage.getItem('admin_session_token');
+    const sessionToken = localStorage.getItem('adminSessionToken');
     
     if (!sessionToken) {
       // If no session token, check if user is authenticated with Firebase
@@ -135,27 +23,15 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
       throw new AdminApiError('관리자 세션이 만료되었습니다. MFA 인증을 다시 진행해주세요.', 401);
     }
 
-    // Generate device fingerprint for every request
-    let deviceFingerprint = 'generation-failed';
-    try {
-      deviceFingerprint = generateDeviceFingerprint();
-    } catch (error) {
-      console.error('Failed to generate device fingerprint in adminRequest:', error);
-      // Use a basic fallback that includes some request context
-      const fallbackComponents = [
-        'admin-api',
-        endpoint.split('/').pop() || 'unknown',
-        Date.now().toString(36)
-      ];
-      deviceFingerprint = 'api-fallback-' + fallbackComponents.join('-');
-    }
+    // Use static fingerprint - device fingerprinting disabled for admin panel
+    const deviceFingerprint = 'admin-session-static';
     
-    console.log('[AdminAPI] Making request to:', endpoint, 'with fingerprint:', deviceFingerprint.substring(0, 10) + '...');
+    console.log('[AdminAPI] Making request to:', endpoint);
     
     // Prepare headers with session token and device fingerprint
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${sessionToken}`,
+      'x-admin-session': sessionToken,
       'x-device-fingerprint': deviceFingerprint,
       ...options.headers,
     };
@@ -172,7 +48,7 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
       
       // If session is invalid, clear it and prompt re-login
       if (response.status === 403 || response.status === 401) {
-        localStorage.removeItem('admin_session_token');
+        localStorage.removeItem('adminSessionToken');
         window.location.href = '/admin/login';
       }
       
@@ -206,8 +82,8 @@ export const adminApi = {
     }),
 
   // Get user details
-  getUserDetails: (docId: string) =>
-    adminRequest(`/api/admin/user-management?docId=${docId}`),
+  getUserDetails: (userId: string) =>
+    adminRequest(`/api/admin/user-details?userId=${userId}`),
 
   // Update user
   updateUser: (docId: string, updates: Record<string, any>, adminAction?: string) =>
@@ -242,4 +118,4 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify({ requestId }),
     }),
-}; 
+};
