@@ -100,22 +100,14 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
     try {
       const sessionData = await AdminSessionManager.validateAdminSession(token);
       if (sessionData && sessionData.email) {
-        // CRITICAL: Verify device fingerprint matches
-        // Allow server-side fallback fingerprints if client fingerprint is pending
-        const fingerprintMatches = sessionData.deviceFingerprint === effectiveFingerprint ||
-          (deviceFingerprint === 'pending' && sessionData.deviceFingerprint.startsWith('server-fallback-')) ||
-          (effectiveFingerprint && effectiveFingerprint.startsWith('server-fallback-') && sessionData.deviceFingerprint.startsWith('server-fallback-'));
-        
-        if (!fingerprintMatches) {
-          console.error('Device fingerprint mismatch for admin session', {
-            email: sessionData.email,
-            expectedFingerprint: sessionData.deviceFingerprint,
-            providedFingerprint: effectiveFingerprint,
-            originalClientFingerprint: deviceFingerprint,
-            ip: ipAddress
-          });
-          return { success: false, error: 'Device verification failed - session invalid' };
-        }
+        // DISABLED: Device fingerprint check for admin - allowing access from any device
+        // This reduces security but allows admin access from different devices/countries
+        console.log('Device fingerprint check disabled for admin access', {
+          email: sessionData.email,
+          sessionFingerprint: sessionData.deviceFingerprint?.substring(0, 10) + '...',
+          providedFingerprint: effectiveFingerprint?.substring(0, 10) + '...',
+          ip: ipAddress
+        });
         
         // Check if email is still in admin whitelist
         if (!ADMIN_EMAILS.includes(sessionData.email)) {

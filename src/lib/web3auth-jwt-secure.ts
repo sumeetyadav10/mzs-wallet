@@ -271,8 +271,8 @@ export async function verifyJWTToken(token: string): Promise<JWTPayload | null> 
     // Remove Bearer prefix if present
     const actualToken = token.replace('Bearer ', '');
 
-    // Verify JWT token
-    const decoded = jwt.verify(actualToken, JWT_SECRET) as JWTPayload;
+    // Verify JWT token with HS256 algorithm
+    const decoded = jwt.verify(actualToken, JWT_SECRET, { algorithms: ['HS256'] }) as JWTPayload;
     
     if (!decoded.userId || !decoded.email) {
       logger.warn('Invalid JWT payload structure', { decoded });
