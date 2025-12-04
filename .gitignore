@@ -67,3 +67,24 @@ local.*
 *.node
 *.pack
 *.bin
+
+# Firebase configuration files
+.firebaserc
+firebase.json
+firestore.rules
+firestore.indexes.json
+firebase-debug.log
+.firebase/
+
+# Data and script files
+*.csv
+*.json
+*.sh
+*.tc
+*.txt
+
+# Exclude specific config files that should be committed
+!package.json
+!package-lock.json
+!tsconfig.json
+!next.config.js

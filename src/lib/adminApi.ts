@@ -7,22 +7,118 @@ export class AdminApiError extends Error {
   }
 }
 
-// Device fingerprinting function - same as AdminAuthContext
+// Device fingerprinting function with graceful fallbacks
+let cachedFingerprint: string | null = null;
+
 const generateDeviceFingerprint = (): string => {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx?.fillText('MZS Admin', 2, 2);
-  const canvasFingerprint = canvas.toDataURL();
+  // Return cached fingerprint if available
+  if (cachedFingerprint) {
+    return cachedFingerprint;
+  }
   
-  const fingerprint = [
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    new Date().getTimezoneOffset(),
-    canvasFingerprint.slice(0, 50)
-  ].join('|');
+  // Only run on client side to avoid hydration issues
+  if (typeof window === 'undefined') {
+    return 'server-render-placeholder';
+  }
   
-  return btoa(fingerprint).slice(0, 50);
+  const components: string[] = [];
+  
+  // 1. User agent and language (always available)
+  components.push(navigator.userAgent || 'unknown-ua');
+  components.push(navigator.language || 'en');
+  
+  // 2. Screen properties with fallback
+  try {
+    components.push(`${screen.width || 0}x${screen.height || 0}`);
+    components.push(`${screen.colorDepth || 0}`);
+  } catch {
+    components.push('0x0');
+    components.push('0');
+  }
+  
+  // 3. Timezone
+  try {
+    components.push(String(new Date().getTimezoneOffset()));
+  } catch {
+    components.push('0');
+  }
+  
+  // 4. Canvas fingerprint with graceful fallback
+  let canvasData = 'canvas-blocked';
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // Test if canvas is actually writable
+      ctx.fillStyle = '#f60';
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = '#069';
+      ctx.font = '11pt Arial';
+      ctx.fillText('MZS Admin', 2, 15);
+      
+      // Try to get data URL
+      try {
+        canvasData = canvas.toDataURL().slice(-50);
+      } catch (e) {
+        // Canvas.toDataURL blocked by privacy settings
+        canvasData = 'canvas-read-blocked';
+      }
+    }
+  } catch (e) {
+    // Canvas API completely blocked
+    canvasData = 'canvas-api-blocked';
+  }
+  components.push(canvasData);
+  
+  // 5. Additional entropy from available APIs
+  const entropy: string[] = [];
+  
+  // Hardware concurrency
+  if (navigator.hardwareConcurrency) {
+    entropy.push(`hw:${navigator.hardwareConcurrency}`);
+  }
+  
+  // Device memory (if available)
+  if ('deviceMemory' in navigator) {
+    entropy.push(`mem:${(navigator as any).deviceMemory}`);
+  }
+  
+  // Platform
+  if (navigator.platform) {
+    entropy.push(`plat:${navigator.platform}`);
+  }
+  
+  // Combine all components
+  const rawFingerprint = components.join('|') + '|' + entropy.join(',');
+  
+  // Create hash using available methods
+  try {
+    // Use subtle crypto if available
+    if (window.crypto && window.crypto.subtle) {
+      // For now, use simple base64 encoding
+      // In production, you'd want to use crypto.subtle.digest
+      cachedFingerprint = btoa(rawFingerprint).replace(/[^a-zA-Z0-9]/g, '').slice(0, 50);
+      return cachedFingerprint;
+    }
+  } catch {
+    // Fallback to simple encoding
+  }
+  
+  // Final fallback: simple base64 encoding
+  try {
+    cachedFingerprint = btoa(rawFingerprint).replace(/[^a-zA-Z0-9]/g, '').slice(0, 50);
+    return cachedFingerprint;
+  } catch {
+    // Even btoa failed, use a simple hash
+    let hash = 0;
+    for (let i = 0; i < rawFingerprint.length; i++) {
+      const char = rawFingerprint.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    cachedFingerprint = 'fallback-' + Math.abs(hash).toString(36).padEnd(41, '0').slice(0, 41);
+    return cachedFingerprint;
+  }
 };
 
 export async function adminRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -40,7 +136,21 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
     }
 
     // Generate device fingerprint for every request
-    const deviceFingerprint = generateDeviceFingerprint();
+    let deviceFingerprint = 'generation-failed';
+    try {
+      deviceFingerprint = generateDeviceFingerprint();
+    } catch (error) {
+      console.error('Failed to generate device fingerprint in adminRequest:', error);
+      // Use a basic fallback that includes some request context
+      const fallbackComponents = [
+        'admin-api',
+        endpoint.split('/').pop() || 'unknown',
+        Date.now().toString(36)
+      ];
+      deviceFingerprint = 'api-fallback-' + fallbackComponents.join('-');
+    }
+    
+    console.log('[AdminAPI] Making request to:', endpoint, 'with fingerprint:', deviceFingerprint.substring(0, 10) + '...');
     
     // Prepare headers with session token and device fingerprint
     const headers = {

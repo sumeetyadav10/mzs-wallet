@@ -112,10 +112,17 @@ export default function LoginPage() {
   const handleMigrate = async (newAddress: string) => {
     if (!legacyUserId) return;
     try {
-      const response = await fetch("/api/auth/migrate", {
+      // Get the session token from sessionStorage
+      const accessToken = sessionStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.');
+      }
+
+      const response = await fetch(`/api/${process.env.NEXT_PUBLIC_API_AUTH_MIGRATE}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           legacyUserId,

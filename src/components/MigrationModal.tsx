@@ -17,10 +17,20 @@ const MigrationModal: React.FC<MigrationModalProps> = ({ legacyUserId, onSuccess
     try {
       await connect();
       const userInfo = await getUserInfo();
+      
+      // Get the session token from sessionStorage
+      const accessToken = sessionStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('Session expired. Please login again.');
+      }
+      
       // Call backend to link Google email to legacy wallet
-      const res = await fetch("/api/auth/migrate", {
+      const res = await fetch(`/api/${process.env.NEXT_PUBLIC_API_AUTH_MIGRATE}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
         body: JSON.stringify({
           legacyUserId,
           googleEmail: userInfo.email,

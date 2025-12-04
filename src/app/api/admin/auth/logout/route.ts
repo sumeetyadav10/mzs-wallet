@@ -15,11 +15,14 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get session from header or cookie
-    const sessionId = request.headers.get('X-Admin-Session') || 
-                     request.cookies.get('admin-session')?.value;
+    // Get JWT token from Authorization header or X-Admin-Session
+    const authHeader = request.headers.get('Authorization');
+    const sessionToken = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : request.headers.get('X-Admin-Session') || 
+        request.cookies.get('admin-session')?.value;
 
-    if (!sessionId) {
+    if (!sessionToken) {
       return NextResponse.json(
         { error: 'No session found' },
         { status: 400 }
@@ -31,12 +34,12 @@ export async function POST(request: NextRequest) {
                      request.headers.get('x-real-ip') || 
                      'unknown';
 
-    // Destroy the session
-    const destroyed = await AdminSessionManager.destroyAdminSession(sessionId);
+    // Destroy the session (expects JWT token)
+    const destroyed = await AdminSessionManager.destroyAdminSession(sessionToken);
 
     if (destroyed) {
       logger.info('🔓 Admin logged out successfully', {
-        sessionId: sessionId.substring(0, 8) + '...',
+        sessionToken: sessionToken.substring(0, 8) + '...',
         ipAddress
       });
     }

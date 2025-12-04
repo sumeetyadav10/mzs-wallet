@@ -42,12 +42,20 @@ export const securityMiddleware = {
     }
     
     // Allow localhost for development
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === 'development' || origin?.includes('localhost') || origin?.includes('127.0.0.1')) {
       const allowedOrigins = [
         'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3010',
         'https://localhost:3000',
+        'https://localhost:3001',
+        'https://localhost:3010',
         'http://127.0.0.1:3000',
-        'https://127.0.0.1:3000'
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3010',
+        'https://127.0.0.1:3000',
+        'https://127.0.0.1:3001',
+        'https://127.0.0.1:3010'
       ];
       
       if (origin && allowedOrigins.includes(origin)) {

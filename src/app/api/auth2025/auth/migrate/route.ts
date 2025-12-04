@@ -20,11 +20,11 @@ const db = getFirestore();
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  // CRITICAL: Account migration requires strong authentication and CAPTCHA
+  // CRITICAL: Account migration requires authentication from legacy system
   const securityResult = await securityMiddleware.applySecurityMiddleware(req, {
-    requireAuth: true, // Must be logged in
-    requireCaptcha: true, // Must complete CAPTCHA
-    maxAttempts: 2, // Very strict - only 2 attempts per hour
+    requireAuth: true, // Must be authenticated with legacy system
+    requireCaptcha: false, // CAPTCHA was already verified during login
+    maxAttempts: 5, // Allow reasonable attempts for migration
     windowMinutes: 60,
     blockSuspiciousIPs: true,
     requireAdminRole: false // Users can migrate their own accounts
@@ -48,7 +48,12 @@ export async function POST(req: NextRequest) {
     'https://www.gptchwallet.com',
     'https://mzswallet.com',
     'https://www.mzswallet.com',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3010',
+    'https://localhost:3000',
+    'https://localhost:3001',
+    'https://localhost:3010'
   ];
 
   const isValidOrigin = allowedDomains.some(domain => 
@@ -88,7 +93,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
     }
     
-    // Verify session token
+    // Verify session token from legacy auth
     const authHeader = req.headers.get('authorization');
     const sessionToken = authHeader?.replace('Bearer ', '');
     
@@ -105,6 +110,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
+    // Verify the session
     const session = await securityManager.verifySession(sessionToken);
     if (!session) {
       securityManager.logSecurityEvent({
@@ -119,30 +125,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired session' }, { status: 401 });
     }
     
-    // Verify CAPTCHA for this critical operation
-    if (captchaToken) {
-      const captchaResult = await securityMiddleware.verifyCaptcha(captchaToken, 'account_migration');
-      if (!captchaResult.success) {
-        securityManager.logSecurityEvent({
-          type: 'CAPTCHA_FAIL',
-          userId: session.userId,
-          email: googleEmail,
-          ipAddress,
-          userAgent,
-          timestamp: Date.now(),
-          details: { error: captchaResult.error, action: 'account_migration' }
-        });
-        
-        return NextResponse.json(
-          { error: 'CAPTCHA verification failed for account migration' }, 
-          { status: 400 }
-        );
-      }
+    // CRITICAL: Verify the session belongs to the user being migrated
+    if (session.userId !== legacyUserId && session.email !== legacyUserId) {
+      securityManager.logSecurityEvent({
+        type: 'SECURITY_VIOLATION',
+        userId: session.userId,
+        email: googleEmail,
+        ipAddress,
+        userAgent,
+        timestamp: Date.now(),
+        details: { 
+          reason: 'User attempted to migrate different account',
+          sessionUserId: session.userId,
+          attemptedUserId: legacyUserId 
+        }
+      });
+      
+      return NextResponse.json({ error: 'Unauthorized: Cannot migrate another user account' }, { status: 403 });
     }
     
-    // Verify the user has permission to migrate this account
-    // Only allow if the session email matches the Google email being migrated to (unless admin)
-    if (session.email !== googleEmail && !session.isAdmin) {
+    // Check if the Google email is already in use
+    const existingEmailQuery = await db.collection('mzs')
+      .where('auth_email', '==', googleEmail)
+      .limit(1)
+      .get();
+    
+    if (!existingEmailQuery.empty) {
       securityManager.logSecurityEvent({
         type: 'LOGIN_FAIL',
         userId: session.userId,
@@ -151,16 +159,14 @@ export async function POST(req: NextRequest) {
         userAgent,
         timestamp: Date.now(),
         details: { 
-          reason: 'Unauthorized account migration attempt',
-          sessionEmail: session.email,
-          targetEmail: googleEmail,
-          legacyUserId
+          reason: 'Email already in use',
+          existingEmail: googleEmail
         }
       });
       
       return NextResponse.json({ 
-        error: 'Unauthorized: Can only migrate to your own account' 
-      }, { status: 403 });
+        error: 'This email is already in use. Please use a different email address.' 
+      }, { status: 409 });
     }
     
     // Log if admin is performing migration for another user

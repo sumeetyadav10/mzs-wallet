@@ -31,7 +31,8 @@ interface AdminLoginAttempt {
 }
 
 export class AdminSessionManager {
-  private static readonly SESSION_DURATION = 8 * 60 * 60 * 1000; // 8 hours
+  // Session duration from environment or default to 24 hours
+  private static readonly SESSION_DURATION = parseInt(process.env.ADMIN_SESSION_DURATION_HOURS || '24') * 60 * 60 * 1000;
   private static readonly MAX_LOGIN_ATTEMPTS = 5;
   private static readonly LOCKOUT_DURATION = 30 * 60 * 1000; // 30 minutes
 
@@ -48,6 +49,26 @@ export class AdminSessionManager {
     deviceFingerprint: string;
   }): Promise<{ sessionToken: string; sessionData: AdminSessionData }> {
     try {
+      // Clean up any existing sessions for this admin first
+      const existingSessionsQuery = await db
+        .collection('admin_sessions')
+        .where('adminId', '==', params.adminId)
+        .where('email', '==', params.email)
+        .get();
+
+      if (!existingSessionsQuery.empty) {
+        const batch = db.batch();
+        existingSessionsQuery.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        
+        logger.log('🧹 Cleaned up existing admin sessions', { 
+          adminId: params.adminId,
+          count: existingSessionsQuery.size 
+        });
+      }
+
       const now = new Date();
       const expiresAt = new Date(now.getTime() + this.SESSION_DURATION);
 
@@ -84,7 +105,9 @@ export class AdminSessionManager {
         adminId: params.adminId, 
         email: params.email,
         role: params.role,
-        sessionId: sessionRef.id
+        sessionId: sessionRef.id,
+        expiresAt: expiresAt.toISOString(),
+        sessionDurationHours: this.SESSION_DURATION / (60 * 60 * 1000)
       });
 
       return { sessionToken, sessionData };
@@ -116,6 +139,7 @@ export class AdminSessionManager {
         .collection('admin_sessions')
         .where('adminId', '==', tokenPayload.userId)
         .where('email', '==', tokenPayload.email)
+        .orderBy('createdAt', 'desc') // Get the most recent session
         .limit(1)
         .get();
 
@@ -150,14 +174,16 @@ export class AdminSessionManager {
       } as AdminSessionData;
 
       // Debug session data
+      const now = new Date();
+      const hoursRemaining = (sessionData.expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000);
       logger.log('📅 Session time check', {
         adminId: sessionData.adminId,
-        createdAt: sessionData.createdAt,
-        expiresAt: sessionData.expiresAt,
-        now: new Date(),
-        isExpired: new Date() > sessionData.expiresAt,
-        rawExpiresAt: rawData.expiresAt,
-        rawExpiresAtType: typeof rawData.expiresAt
+        createdAt: sessionData.createdAt.toISOString(),
+        expiresAt: sessionData.expiresAt.toISOString(),
+        now: now.toISOString(),
+        isExpired: now > sessionData.expiresAt,
+        hoursRemaining: Math.round(hoursRemaining * 10) / 10,
+        sessionDurationHours: this.SESSION_DURATION / (60 * 60 * 1000)
       });
       
       // Check if session is expired

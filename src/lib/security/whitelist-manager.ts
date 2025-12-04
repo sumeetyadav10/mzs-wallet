@@ -4,6 +4,9 @@ export class WhitelistManager {
   private static readonly ALLOWED_DOMAINS = [
     'mzswallet.com',
     'localhost',
+    'localhost:3000',
+    'localhost:3001',
+    'localhost:3010',
     '127.0.0.1'
   ];
 
@@ -14,10 +17,20 @@ export class WhitelistManager {
   ];
 
   static isDomainAllowed(domain: string): boolean {
-    const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//, '').split(':')[0];
-    return this.ALLOWED_DOMAINS.some(allowed => 
-      cleanDomain === allowed || cleanDomain.endsWith('.' + allowed)
-    );
+    const cleanDomain = domain.toLowerCase().replace(/^https?:\/\//, '');
+    const domainWithoutPort = cleanDomain.split(':')[0];
+    
+    return this.ALLOWED_DOMAINS.some(allowed => {
+      // Check exact match (including port)
+      if (cleanDomain === allowed) return true;
+      
+      // Check domain without port
+      const allowedWithoutPort = allowed.split(':')[0];
+      if (domainWithoutPort === allowedWithoutPort) return true;
+      
+      // Check subdomain match
+      return domainWithoutPort.endsWith('.' + allowedWithoutPort);
+    });
   }
 
   static isIpAllowed(ip: string): boolean {
@@ -29,7 +42,8 @@ export class WhitelistManager {
     
     try {
       const url = new URL(origin);
-      const domain = url.hostname;
+      // Include port in domain check if present
+      const domain = url.port ? `${url.hostname}:${url.port}` : url.hostname;
       const isAllowed = this.isDomainAllowed(domain);
       
       if (!isAllowed) {

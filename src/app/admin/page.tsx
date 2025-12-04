@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FaGolfBall, FaRegCopy, FaExternalLinkAlt, FaUser, FaCheck, FaTimes, FaSearch, FaSpinner } from 'react-icons/fa';
 import SuperSearch from './components/SuperSearch';
 import UserManager from './components/UserManager';
@@ -56,24 +56,42 @@ export default function AdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  
+  // Track active async operations
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true);
+    
+    // Cleanup function
+    return () => {
+      // Cancel any pending requests on unmount
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin || !sessionToken)) {
+    // Only redirect after mount to avoid hydration issues
+    if (mounted && !authLoading && (!user || !isAdmin || !sessionToken)) {
       setRedirecting(true);
       router.push('/admin/login');
     }
-  }, [authLoading, user, isAdmin, sessionToken, router]);
+  }, [mounted, authLoading, user, isAdmin, sessionToken, router]);
 
   // Load recovery requests on mount and tab change
   useEffect(() => {
-    // Only fetch data if user is authenticated and is admin
-    if (!authLoading && user && isAdmin && sessionToken) {
+    // Only fetch data if mounted and user is authenticated
+    if (mounted && !authLoading && user && isAdmin && sessionToken) {
       if (activeTab === 'recovery') {
         fetchRequests();
       }
     }
-  }, [activeTab, authLoading, user, isAdmin, sessionToken]);
+  }, [activeTab, mounted, authLoading, user, isAdmin, sessionToken]);
 
   // Filter recovery requests
   useEffect(() => {
@@ -179,12 +197,25 @@ export default function AdminPanel() {
   }, [userAddresses]);
 
   const fetchRequests = async () => {
+    // Check if mounted before starting
+    if (!mounted) return;
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    
     try {
       setLoading(true);
       setError(null);
       const data = await adminApi.getRecoveryRequests();
-      setRequests(data.requests);
+      
+      // Check if still mounted and not aborted
+      if (!abortController.signal.aborted && mounted) {
+        setRequests(data.requests);
+      }
     } catch (err) {
+      // Don't update state if unmounted or aborted
+      if (abortController.signal.aborted || !mounted) return;
+      
       // Don't set error state for authentication errors to prevent infinite loops
       if (err instanceof AdminApiError && err.message.includes('인증')) {
         console.log('Authentication error in fetchRequests, not setting error state');
@@ -192,7 +223,9 @@ export default function AdminPanel() {
       }
       setError(err instanceof AdminApiError ? err.message : '복구 요청을 가져오는 중 오류가 발생했습니다.');
     } finally {
-      setLoading(false);
+      if (!abortController.signal.aborted && mounted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -238,8 +271,8 @@ export default function AdminPanel() {
     // Refresh current tab data if needed
   };
 
-  // Show loading state while authentication is being checked or redirecting
-  if (authLoading || redirecting) {
+  // Show loading state while authentication is being checked, redirecting, or not mounted
+  if (!mounted || authLoading || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--golf-gradient)]">
         <div className="golf-pattern absolute inset-0 pointer-events-none"></div>
@@ -253,9 +286,9 @@ export default function AdminPanel() {
     );
   }
 
-  // Don't render the admin panel if user is not authenticated or not admin
-  if (!user || !isAdmin || !sessionToken) {
-    return null; // Return nothing while redirect happens
+  // Don't render the admin panel if not ready
+  if (!mounted || authLoading || redirecting || !user || !isAdmin || !sessionToken) {
+    return null; // Return nothing while loading/redirecting
   }
 
   return (

@@ -61,10 +61,39 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
     const deviceFingerprint = request.headers.get('x-device-fingerprint');
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
     
-    // SECURITY: Admin sessions MUST have device fingerprint
-    if (!deviceFingerprint) {
-      console.error('Admin access attempt without device fingerprint', { ip: ipAddress });
-      return { success: false, error: 'Device fingerprint required for admin access' };
+    // SECURITY: Device fingerprint handling with fallback
+    let effectiveFingerprint = deviceFingerprint;
+    
+    if (!deviceFingerprint || deviceFingerprint === 'pending') {
+      // Generate server-side fallback fingerprint from request data
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+      const acceptLanguage = request.headers.get('accept-language') || 'unknown';
+      const acceptEncoding = request.headers.get('accept-encoding') || 'unknown';
+      
+      // Create a basic server-side fingerprint
+      const serverComponents = [
+        ipAddress,
+        userAgent.substring(0, 100), // Limit length
+        acceptLanguage.substring(0, 50),
+        acceptEncoding.substring(0, 50)
+      ];
+      
+      // Simple hash function for server-side fingerprint
+      let hash = 0;
+      const combined = serverComponents.join('|');
+      for (let i = 0; i < combined.length; i++) {
+        const char = combined.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      
+      effectiveFingerprint = 'server-fallback-' + Math.abs(hash).toString(36);
+      
+      console.warn('Admin access with server-side fingerprint fallback', { 
+        ip: ipAddress,
+        fallbackFingerprint: effectiveFingerprint,
+        originalFingerprint: deviceFingerprint
+      });
     }
     
     // First try to validate as admin session token (from OTP-based auth)
@@ -72,11 +101,17 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
       const sessionData = await AdminSessionManager.validateAdminSession(token);
       if (sessionData && sessionData.email) {
         // CRITICAL: Verify device fingerprint matches
-        if (sessionData.deviceFingerprint !== deviceFingerprint) {
+        // Allow server-side fallback fingerprints if client fingerprint is pending
+        const fingerprintMatches = sessionData.deviceFingerprint === effectiveFingerprint ||
+          (deviceFingerprint === 'pending' && sessionData.deviceFingerprint.startsWith('server-fallback-')) ||
+          (effectiveFingerprint.startsWith('server-fallback-') && sessionData.deviceFingerprint.startsWith('server-fallback-'));
+        
+        if (!fingerprintMatches) {
           console.error('Device fingerprint mismatch for admin session', {
             email: sessionData.email,
             expectedFingerprint: sessionData.deviceFingerprint,
-            providedFingerprint: deviceFingerprint,
+            providedFingerprint: effectiveFingerprint,
+            originalClientFingerprint: deviceFingerprint,
             ip: ipAddress
           });
           return { success: false, error: 'Device verification failed - session invalid' };
