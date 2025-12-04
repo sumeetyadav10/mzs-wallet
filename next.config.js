@@ -44,8 +44,8 @@ const nextConfig = {
 
   // Experimental features for better error handling
   experimental: {
-    // Optimize CSS handling
-    optimizeCss: true,
+    // Optimize CSS handling - disabled due to missing critters dependency
+    optimizeCss: false,
     // Better error recovery
     fallbackNodePolyfills: false,
   },

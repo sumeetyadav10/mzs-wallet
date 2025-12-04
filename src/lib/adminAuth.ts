@@ -104,7 +104,7 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
         // Allow server-side fallback fingerprints if client fingerprint is pending
         const fingerprintMatches = sessionData.deviceFingerprint === effectiveFingerprint ||
           (deviceFingerprint === 'pending' && sessionData.deviceFingerprint.startsWith('server-fallback-')) ||
-          (effectiveFingerprint.startsWith('server-fallback-') && sessionData.deviceFingerprint.startsWith('server-fallback-'));
+          (effectiveFingerprint && effectiveFingerprint.startsWith('server-fallback-') && sessionData.deviceFingerprint.startsWith('server-fallback-'));
         
         if (!fingerprintMatches) {
           console.error('Device fingerprint mismatch for admin session', {

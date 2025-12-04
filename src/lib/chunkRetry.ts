@@ -5,10 +5,19 @@ const MAX_RETRIES = 3;
 // Keep track of retries
 const retryCount = new Map<string, number>();
 
+// Extend window interface for webpack
+declare global {
+  interface Window {
+    __webpack_require__?: {
+      e: (chunkId: string) => Promise<any>;
+    };
+  }
+}
+
 // Original dynamic import function
 const originalImport = window.__webpack_require__?.e;
 
-if (originalImport) {
+if (originalImport && window.__webpack_require__) {
   // Override webpack's chunk loading
   window.__webpack_require__.e = function (chunkId: string): Promise<any> {
     let retries = retryCount.get(chunkId) || 0;
