@@ -83,6 +83,13 @@ firebase-debug.log
 *.tc
 *.txt
 
+# Security-sensitive scripts
+check-*.js
+analyze-*.js
+add-*.js
+*firestore*.js
+*wallet-check*.js
+
 # Exclude specific config files that should be committed
 !package.json
 !package-lock.json
