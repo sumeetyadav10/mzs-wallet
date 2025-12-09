@@ -271,24 +271,37 @@ export default function AdminPanel() {
     // Refresh current tab data if needed
   };
 
-  // Show loading state while authentication is being checked, redirecting, or not mounted
-  if (!mounted || authLoading || redirecting) {
+  // Show loading state while authentication is being checked or not mounted
+  if (!mounted || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--golf-gradient)]">
         <div className="golf-pattern absolute inset-0 pointer-events-none"></div>
         <div className="relative z-10 text-center">
           <FaSpinner className="animate-spin text-[var(--golf-gold)] mx-auto mb-4" size={48} />
           <div className="text-[var(--golf-dark)] font-semibold text-lg">
-            {authLoading ? '인증 확인 중...' : '관리자 로그인으로 이동 중...'}
+            인증 확인 중...
           </div>
         </div>
       </div>
     );
   }
 
-  // Don't render the admin panel if not ready
-  if (!mounted || authLoading || redirecting || !user || !isAdmin || !sessionToken) {
-    return null; // Return nothing while loading/redirecting
+  // Redirect or show nothing if not authenticated
+  if (!user || !isAdmin || !sessionToken) {
+    if (redirecting) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[var(--golf-gradient)]">
+          <div className="golf-pattern absolute inset-0 pointer-events-none"></div>
+          <div className="relative z-10 text-center">
+            <FaSpinner className="animate-spin text-[var(--golf-gold)] mx-auto mb-4" size={48} />
+            <div className="text-[var(--golf-dark)] font-semibold text-lg">
+              관리자 로그인으로 이동 중...
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
   }
 
   return (
