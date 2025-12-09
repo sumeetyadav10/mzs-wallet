@@ -83,15 +83,24 @@ export default function AdminPanel() {
     }
   }, [mounted, authLoading, user, isAdmin, sessionToken, router]);
 
-  // Load recovery requests on mount and tab change
+  // Load recovery requests on mount
   useEffect(() => {
-    // Only fetch data if mounted and user is authenticated
-    if (mounted && !authLoading && user && isAdmin && sessionToken) {
-      if (activeTab === 'recovery') {
-        fetchRequests();
-      }
+    // Fetch immediately once authenticated
+    if (user && isAdmin && sessionToken) {
+      fetchRequests();
+      
+      // Set up auto-refresh every 30 seconds
+      const interval = setInterval(fetchRequests, 30000);
+      return () => clearInterval(interval);
     }
-  }, [activeTab, mounted, authLoading, user, isAdmin, sessionToken]);
+  }, [user, isAdmin, sessionToken]);
+  
+  // Fetch when tab changes
+  useEffect(() => {
+    if (activeTab === 'recovery' && user && isAdmin && sessionToken) {
+      fetchRequests();
+    }
+  }, [activeTab]);
 
   // Filter recovery requests
   useEffect(() => {
@@ -197,35 +206,22 @@ export default function AdminPanel() {
   }, [userAddresses]);
 
   const fetchRequests = async () => {
-    // Check if mounted before starting
-    if (!mounted) return;
-    
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-    
     try {
       setLoading(true);
       setError(null);
       const data = await adminApi.getRecoveryRequests();
-      
-      // Check if still mounted and not aborted
-      if (!abortController.signal.aborted && mounted) {
-        setRequests(data.requests);
-      }
+      setRequests(data.requests);
     } catch (err) {
-      // Don't update state if unmounted or aborted
-      if (abortController.signal.aborted || !mounted) return;
-      
-      // Don't set error state for authentication errors to prevent infinite loops
-      if (err instanceof AdminApiError && err.message.includes('인증')) {
-        console.log('Authentication error in fetchRequests, not setting error state');
-        return;
+      // Only set error if it's not an auth error (to prevent loops)
+      if (err instanceof AdminApiError) {
+        if (!err.message.includes('인증') && !err.message.includes('로그인')) {
+          setError(err.message);
+        }
+      } else {
+        setError('복구 요청을 가져오는 중 오류가 발생했습니다.');
       }
-      setError(err instanceof AdminApiError ? err.message : '복구 요청을 가져오는 중 오류가 발생했습니다.');
     } finally {
-      if (!abortController.signal.aborted && mounted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   };
 

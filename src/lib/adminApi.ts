@@ -46,35 +46,38 @@ function generateDeviceFingerprint(): string {
 
 export async function adminRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
-    // First check for admin session token (from MFA auth)
+    // Get both session token and Firebase user
     const sessionToken = localStorage.getItem('adminSessionToken');
+    const user = auth.currentUser;
     
-    if (!sessionToken) {
-      // If no session token, check if user is authenticated with Firebase
-      const user = auth.currentUser;
-      if (!user) {
-        throw new AdminApiError('인증되지 않은 사용자입니다. 관리자 패널에 다시 로그인하세요.', 401);
-      }
-      throw new AdminApiError('관리자 세션이 만료되었습니다. MFA 인증을 다시 진행해주세요.', 401);
+    if (!sessionToken || !user) {
+      // Clear any stale data
+      localStorage.removeItem('adminSessionToken');
+      throw new AdminApiError('인증되지 않은 사용자입니다. 관리자 패널에 다시 로그인하세요.', 401);
     }
 
+    // Get Firebase token for additional auth
+    const firebaseToken = await user.getIdToken();
+    
     // Generate unique device fingerprint
     const deviceFingerprint = generateDeviceFingerprint();
     
     console.log('[AdminAPI] Making request to:', endpoint);
     
-    // Prepare headers with session token and device fingerprint
+    // Prepare headers matching GPTCH pattern
     const headers = {
       'Content-Type': 'application/json',
-      'x-admin-session': sessionToken,
+      'Authorization': `Bearer ${firebaseToken}`,
+      'X-Admin-Session': sessionToken,
       'x-device-fingerprint': deviceFingerprint,
       ...options.headers,
     };
 
-    // Make the request
+    // Make the request with credentials
     const response = await fetch(endpoint, {
       ...options,
       headers,
+      credentials: 'include', // Important for cookies
     });
 
     // Handle response
@@ -84,7 +87,12 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
       // If session is invalid, clear it and prompt re-login
       if (response.status === 403 || response.status === 401) {
         localStorage.removeItem('adminSessionToken');
-        window.location.href = '/admin/login';
+        
+        // Only redirect if it's a session error
+        if (errorData.error?.includes('session') || errorData.error?.includes('세션')) {
+          window.location.href = '/admin/login';
+          return; // Don't throw, just redirect
+        }
       }
       
       throw new AdminApiError(
