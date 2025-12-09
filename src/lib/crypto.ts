@@ -2,17 +2,17 @@ import CryptoJS from 'crypto-js';
 import { logger } from '@/lib/logger';
 
 export class CryptoUtils {
-  private static readonly ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.WALLET_ENCRYPTION_KEY;
-  
-  static {
-    if (!this.ENCRYPTION_KEY) {
+  private static getEncryptionKey(): string {
+    const key = process.env.ENCRYPTION_KEY || process.env.WALLET_ENCRYPTION_KEY;
+    if (!key) {
       throw new Error('ENCRYPTION_KEY or WALLET_ENCRYPTION_KEY environment variable is required');
     }
+    return key;
   }
 
   static encrypt(text: string, key?: string): string {
     try {
-      const encryptionKey = key || this.ENCRYPTION_KEY;
+      const encryptionKey = key || this.getEncryptionKey();
       if (!encryptionKey) {
         throw new Error('Encryption key is required');
       }
@@ -26,7 +26,7 @@ export class CryptoUtils {
 
   static decrypt(encryptedText: string, key?: string): string {
     try {
-      const encryptionKey = key || this.ENCRYPTION_KEY;
+      const encryptionKey = key || this.getEncryptionKey();
       if (!encryptionKey) {
         throw new Error('Encryption key is required');
       }

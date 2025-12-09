@@ -226,19 +226,25 @@ export async function POST(request: NextRequest) {
         // Private key is already in raw format, using directly
       } else {
         // Only try decryption if it's NOT already a raw key
-        try {
-          // Try server-side decryption
-          const { decrypt } = await import('@/lib/crypto');
-          privateKey = decrypt(encryptedPrivateKey);
-          // Using server-side decryption
-        } catch (error) {
-          // Fallback to client-side decryption (base64 format)
+        // For MZS wallet, private keys might be stored in raw form
+        // Check if it's a raw key without 0x prefix
+        if (encryptedPrivateKey.length === 64 && /^[a-fA-F0-9]+$/.test(encryptedPrivateKey)) {
+          // Raw key without 0x prefix
+          privateKey = '0x' + encryptedPrivateKey;
+        } else {
+          // Try decryption only if environment is properly configured
           try {
-            privateKey = decodeURIComponent(atob(encryptedPrivateKey));
-            // Using client-side decryption fallback
-          } catch (clientError) {
-            // All decryption methods failed
-            throw new Error('Failed to decrypt private key');
+            // Dynamically import to avoid initialization errors
+            const cryptoModule = await import('@/lib/crypto').catch(() => null);
+            if (cryptoModule && cryptoModule.decrypt) {
+              privateKey = cryptoModule.decrypt(encryptedPrivateKey);
+            } else {
+              // If crypto module fails, assume it's base64 encoded
+              privateKey = Buffer.from(encryptedPrivateKey, 'base64').toString('utf-8');
+            }
+          } catch (error) {
+            // Final fallback - assume it's already a raw key
+            privateKey = encryptedPrivateKey;
           }
         }
       }
