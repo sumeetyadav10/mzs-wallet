@@ -4,6 +4,7 @@ import ChunkErrorBoundary from '@/components/ChunkErrorBoundary';
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 import './globals.css';
+import './web3auth-modal-fixes.css';
 
 export default function RootLayout({
   children,
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
       </head>
       <body>
         {/* Only load reCAPTCHA for non-admin routes */}

@@ -88,6 +88,12 @@ button, .btn {
   overflow: hidden;
 }
 
+/* Don't apply overflow hidden to Web3Auth modal buttons */
+div[class*="web3auth-modal"] button,
+div[class*="w3a-modal"] button {
+  overflow: visible !important;
+}
+
 button:hover, .btn:hover {
   background: linear-gradient(90deg, #1b5e20 0%, #e6c200 100%);
   color: var(--golf-white);

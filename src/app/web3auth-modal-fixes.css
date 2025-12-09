@@ -1,0 +1,68 @@
+/* Web3Auth Modal Fixes for Mobile Devices */
+
+/* Ensure Web3Auth modal is scrollable on mobile */
+.web3auth-modal,
+.web3auth-modal-container,
+div[class*="web3auth-modal"],
+div[class*="w3a-modal"],
+div[class*="openlogin"] {
+  max-height: 100vh !important;
+  max-height: 100dvh !important; /* Dynamic viewport height for mobile */
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important; /* Smooth scrolling on iOS */
+}
+
+/* Fix modal positioning */
+div[class*="web3auth-modal"],
+div[class*="w3a-modal"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999999 !important;
+}
+
+/* Ensure modal content is scrollable */
+div[class*="web3auth-modal"] > div,
+div[class*="w3a-modal"] > div,
+div[class*="openlogin"] > div {
+  max-height: 90vh !important;
+  max-height: 90dvh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin: 5vh auto !important;
+}
+
+/* Fix font sizes for mobile */
+@media (max-width: 768px) {
+  div[class*="web3auth-modal"] input,
+  div[class*="w3a-modal"] input,
+  div[class*="openlogin"] input {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+  }
+  
+  div[class*="web3auth-modal"] button,
+  div[class*="w3a-modal"] button,
+  div[class*="openlogin"] button {
+    font-size: 16px !important;
+    min-height: 44px !important; /* Apple's recommended touch target size */
+  }
+}
+
+/* Ensure body doesn't prevent scrolling when modal is open */
+body.web3auth-modal-open,
+body:has(div[class*="web3auth-modal"]),
+body:has(div[class*="w3a-modal"]) {
+  overflow: auto !important;
+  position: relative !important;
+  height: auto !important;
+}
+
+/* Fix for iOS Safari viewport issues */
+@supports (-webkit-touch-callout: none) {
+  div[class*="web3auth-modal"],
+  div[class*="w3a-modal"] {
+    height: -webkit-fill-available !important;
+  }
+}
