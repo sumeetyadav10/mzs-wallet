@@ -53,6 +53,43 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
 
+  // Generate device fingerprint for security
+  const generateDeviceFingerprint = (): string => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillText('Device fingerprint test', 2, 2);
+      }
+      
+      const fingerprint = {
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        platform: navigator.platform || 'unknown',
+        screenResolution: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        plugins: navigator.plugins.length,
+        canvas: canvas.toDataURL().substring(0, 100)
+      };
+      
+      // Create a hash from the fingerprint data
+      const fpString = JSON.stringify(fingerprint);
+      let hash = 0;
+      for (let i = 0; i < fpString.length; i++) {
+        const char = fpString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      
+      return `fp_${Math.abs(hash).toString(16).padStart(8, '0')}`;
+    } catch (error) {
+      // Fallback if fingerprinting fails
+      return `fp_fallback_${Date.now().toString(16)}`;
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       if (!ADMIN_EMAILS.includes(email)) {
@@ -66,9 +103,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseToken = await userCredential.user.getIdToken();
       
-      // Use static fingerprint - device fingerprinting disabled for admin panel
-      const currentFingerprint = 'admin-session-static';
-      console.log('[AdminAuth] Sending MFA challenge');
+      // Generate unique device fingerprint
+      const currentFingerprint = generateDeviceFingerprint();
+      console.log('[AdminAuth] Generated device fingerprint:', currentFingerprint);
       
       // Initiate MFA challenge
       const response = await fetch('/api/admin/auth/mfa-challenge', {
@@ -76,7 +113,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${firebaseToken}`,
-        'x-device-fingerprint': 'admin-session-static',
+        'x-device-fingerprint': currentFingerprint,
       },
       body: JSON.stringify({
         adminId,
@@ -134,14 +171,15 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const verifyMFA = async (challengeId: string, code: string) => {
-    // Use static fingerprint - device fingerprinting disabled for admin panel
-    console.log('[AdminAuth] Sending MFA verify');
+    // Generate the same device fingerprint used during login
+    const currentFingerprint = generateDeviceFingerprint();
+    console.log('[AdminAuth] Sending MFA verify with fingerprint:', currentFingerprint);
     
     const response = await fetch('/api/admin/auth/mfa-verify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-device-fingerprint': 'admin-session-static',
+        'x-device-fingerprint': currentFingerprint,
       },
       body: JSON.stringify({
         challengeId,
@@ -163,12 +201,13 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const logout = useCallback(async () => {
     try {
       if (sessionToken) {
+        const currentFingerprint = generateDeviceFingerprint();
         const response = await fetch('/api/admin/auth/logout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'x-admin-session': sessionToken,
-            'x-device-fingerprint': 'admin-session-static',
+            'x-device-fingerprint': currentFingerprint,
           }
         });
         

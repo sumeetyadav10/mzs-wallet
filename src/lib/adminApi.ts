@@ -7,7 +7,42 @@ export class AdminApiError extends Error {
   }
 }
 
-// Device fingerprinting removed - admin sessions are secured through other means
+// Generate device fingerprint for security
+function generateDeviceFingerprint(): string {
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.textBaseline = 'top';
+      ctx.font = '14px Arial';
+      ctx.fillText('Device fingerprint test', 2, 2);
+    }
+    
+    const fingerprint = {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      platform: navigator.platform || 'unknown',
+      screenResolution: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      plugins: navigator.plugins.length,
+      canvas: canvas.toDataURL().substring(0, 100)
+    };
+    
+    // Create a hash from the fingerprint data
+    const fpString = JSON.stringify(fingerprint);
+    let hash = 0;
+    for (let i = 0; i < fpString.length; i++) {
+      const char = fpString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return `fp_${Math.abs(hash).toString(16).padStart(8, '0')}`;
+  } catch (error) {
+    // Fallback if fingerprinting fails
+    return `fp_fallback_${Date.now().toString(16)}`;
+  }
+}
 
 export async function adminRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
   try {
@@ -23,8 +58,8 @@ export async function adminRequest(endpoint: string, options: RequestInit = {}):
       throw new AdminApiError('관리자 세션이 만료되었습니다. MFA 인증을 다시 진행해주세요.', 401);
     }
 
-    // Use static fingerprint - device fingerprinting disabled for admin panel
-    const deviceFingerprint = 'admin-session-static';
+    // Generate unique device fingerprint
+    const deviceFingerprint = generateDeviceFingerprint();
     
     console.log('[AdminAPI] Making request to:', endpoint);
     
