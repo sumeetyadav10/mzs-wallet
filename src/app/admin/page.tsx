@@ -137,13 +137,7 @@ export default function AdminPanel() {
         const batch = missingUserIds.slice(i, i + batchSize);
         await Promise.all(batch.map(async (userId) => {
           try {
-            const res = await fetch(`/api/admin/user-details?userId=${userId}`, {
-              headers: {
-                'Authorization': `Bearer ${await user.getIdToken()}`,
-              },
-            });
-            if (!res.ok) return;
-            const data = await res.json();
+            const data = await adminApi.getUserDetails(userId);
             if (data.user && data.user.address) {
               newAddresses[userId] = data.user.address;
             }
