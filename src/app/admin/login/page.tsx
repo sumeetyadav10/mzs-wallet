@@ -36,15 +36,27 @@ export default function AdminLogin() {
     try {
       const result = await login(email, password);
       
+      console.log('[AdminLogin] Login result:', result);
+      
+      // Check if login was successful
+      if (!result.success) {
+        setError(result.error || '로그인에 실패했습니다.');
+        setLoading(false);
+        return;
+      }
+      
       if (result.requireMFA) {
+        console.log('[AdminLogin] MFA required, showing OTP modal');
         setChallengeId(result.challengeId!);
         setAdminId(result.adminId!);
         setShowOTPModal(true);
+        // Keep loading true until OTP is complete
       } else {
         // Direct login without MFA (shouldn't happen with current setup)
         router.push('/admin');
       }
     } catch (err) {
+      console.error('[AdminLogin] Login error:', err);
       setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
       setLoading(false); // Only set loading false on error
     }

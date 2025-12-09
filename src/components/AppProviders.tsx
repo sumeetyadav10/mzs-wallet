@@ -29,13 +29,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // For admin routes, don't wrap with Web3Auth providers
+  // For admin routes, don't wrap with Web3Auth or Captcha providers
   if (isAdminRoute) {
-    return (
-      <CaptchaProvider>
-        {children}
-      </CaptchaProvider>
-    );
+    return <>{children}</>;
   }
 
   if (isMobile) {

@@ -14,11 +14,8 @@ if (!getApps().length) {
   });
 }
 
-// Admin email whitelist - Update these with your admin emails
-const ADMIN_EMAILS = [
-  'whdtj74@gmail.com',
-  // Add more admin emails here
-];
+// Admin access is now determined by Firebase authentication
+// Any user with a valid Firebase account can access admin panel
 
 export async function verifyAdminToken(request: NextRequest): Promise<{ success: boolean; email?: string; error?: string }> {
   try {
@@ -38,11 +35,7 @@ export async function verifyAdminToken(request: NextRequest): Promise<{ success:
       return { success: false, error: 'No email found in token' };
     }
 
-    // Check if email is in admin whitelist
-    if (!ADMIN_EMAILS.includes(email)) {
-      return { success: false, error: 'Email not authorized for admin access' };
-    }
-
+    // Any authenticated Firebase user can access admin panel
     return { success: true, email };
   } catch (error) {
     console.error('Admin token verification error:', error);
@@ -52,12 +45,11 @@ export async function verifyAdminToken(request: NextRequest): Promise<{ success:
 
 export async function verifyAdminSession(request: NextRequest): Promise<{ success: boolean; email?: string; adminId?: string; error?: string }> {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { success: false, error: 'Missing or invalid authorization header' };
+    // Get admin session token from X-Admin-Session header
+    const sessionToken = request.headers.get('x-admin-session');
+    if (!sessionToken) {
+      return { success: false, error: 'Missing admin session token' };
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
     const deviceFingerprint = request.headers.get('x-device-fingerprint');
     const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
     
@@ -98,7 +90,7 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
     
     // First try to validate as admin session token (from OTP-based auth)
     try {
-      const sessionData = await AdminSessionManager.validateAdminSession(token);
+      const sessionData = await AdminSessionManager.validateAdminSession(sessionToken);
       if (sessionData && sessionData.email) {
         // DISABLED: Device fingerprint check for admin - allowing access from any device
         // This reduces security but allows admin access from different devices/countries
@@ -108,11 +100,6 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
           providedFingerprint: effectiveFingerprint?.substring(0, 10) + '...',
           ip: ipAddress
         });
-        
-        // Check if email is still in admin whitelist
-        if (!ADMIN_EMAILS.includes(sessionData.email)) {
-          return { success: false, error: 'Email no longer authorized for admin access' };
-        }
         
         // Verify this is an actual admin session (created via OTP auth)
         if (!sessionData.role || sessionData.role !== 'admin') {
@@ -145,7 +132,6 @@ export async function verifyAdminSession(request: NextRequest): Promise<{ succes
 }
 
 export function isAdminEmail(email: string): boolean {
-  return ADMIN_EMAILS.includes(email);
-}
-
-export { ADMIN_EMAILS }; 
+  // Any email with a Firebase account is considered admin
+  return !!email;
+} 

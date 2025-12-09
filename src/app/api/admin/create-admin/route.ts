@@ -23,14 +23,8 @@ export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json();
     
-    // Security check - only allow admin emails from environment
-    const adminEmails = process.env.ADMIN_EMAILS 
-      ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim())
-      : [];
-    
-    if (!adminEmails.includes(email)) {
-      return NextResponse.json({ error: 'Unauthorized email' }, { status: 403 });
-    }
+    // Any valid email can create an admin account
+    // Firebase authentication will validate the email/password
 
     if (!password || password.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 });

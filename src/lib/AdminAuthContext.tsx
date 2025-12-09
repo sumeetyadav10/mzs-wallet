@@ -5,8 +5,8 @@ import { User, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/a
 import { auth } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
-// Define admin emails who can access the admin panel
-const ADMIN_EMAILS = ['suda159@gmail.com', 'yadsum396@gmail.com'];
+// Admin access is now determined by Firebase authentication
+// Any user with a valid Firebase account can access admin panel
 
 interface AdminAuthContextType {
   user: User | null;
@@ -51,7 +51,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   } | null>(null);
   // Device fingerprinting removed for admin panel - session-based security is sufficient
 
-  const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
+  // Any authenticated Firebase user is considered an admin
+  const isAdmin = !!user?.email;
 
   // Generate device fingerprint for security
   const generateDeviceFingerprint = (): string => {
@@ -92,16 +93,12 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const login = async (email: string, password: string) => {
     try {
-      if (!ADMIN_EMAILS.includes(email)) {
-        throw new Error('Unauthorized email address');
-      }
+      // First authenticate with Firebase - this validates the user exists
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseToken = await userCredential.user.getIdToken();
       
       // Generate admin ID from email
       const adminId = email.split('@')[0];
-      
-      // First authenticate with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseToken = await userCredential.user.getIdToken();
       
       // Generate unique device fingerprint
       const currentFingerprint = generateDeviceFingerprint();

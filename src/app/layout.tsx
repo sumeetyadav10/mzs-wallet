@@ -2,6 +2,7 @@
 import { AppProviders } from '@/components/AppProviders';
 import ChunkErrorBoundary from '@/components/ChunkErrorBoundary';
 import Script from 'next/script';
+import { usePathname } from 'next/navigation';
 import './globals.css';
 
 export default function RootLayout({
@@ -9,16 +10,22 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith('/admin');
+  
   return (
     <html lang="en">
       <head>
         <meta httpEquiv="Cross-Origin-Opener-Policy" content="same-origin" />
       </head>
       <body>
-        <Script 
-          src="https://www.google.com/recaptcha/api.js" 
-          strategy="lazyOnload"
-        />
+        {/* Only load reCAPTCHA for non-admin routes */}
+        {!isAdminRoute && (
+          <Script 
+            src="https://www.google.com/recaptcha/api.js" 
+            strategy="lazyOnload"
+          />
+        )}
         <Script
           id="chunk-retry"
           strategy="beforeInteractive"
