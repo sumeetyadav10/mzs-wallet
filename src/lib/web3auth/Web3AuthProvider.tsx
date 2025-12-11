@@ -72,11 +72,6 @@ export const Web3AuthProvider = ({ children }: { children: React.ReactNode }) =>
             clientId,
             network: "sapphire_mainnet",
             uxMode: "popup",
-            whiteLabel: {
-              appName: "MZS Wallet",
-              defaultLanguage: "ko",
-              mode: "auto", // Respects system theme
-            },
           },
         });
 
