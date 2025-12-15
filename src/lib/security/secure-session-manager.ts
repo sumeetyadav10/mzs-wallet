@@ -44,11 +44,17 @@ export class SecureSessionManager extends SessionManager {
       throw new Error('JWT_SECRET environment variable is required for session creation');
     }
     
+    // Ensure userId is a valid string for JWT subject
+    const subjectId = sessionData.userId || sessionData.email || 'unknown';
+    if (typeof subjectId !== 'string' || !subjectId) {
+      throw new Error('Invalid userId or email for session creation');
+    }
+    
     const token = jwt.sign(sessionData, jwtSecret, {
       expiresIn: '24h',
       issuer: 'mzs-wallet',
       audience: 'mzs-wallet-users',
-      subject: sessionData.userId
+      subject: subjectId
     });
     
     return { 

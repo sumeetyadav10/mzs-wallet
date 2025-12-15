@@ -18,6 +18,9 @@ const db = getFirestore();
 
 export const dynamic = 'force-dynamic';
 
+// Add timeout for long-running queries
+export const maxDuration = 30; // 30 seconds timeout
+
 export async function POST(request: NextRequest) {
   // Verify admin authentication with device fingerprint
   const authResult = await verifyAdminSession(request);
@@ -41,7 +44,15 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const { searchTerm, searchFields, limit = 50 } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      logger.error('Invalid JSON in request body:', parseError);
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+    
+    const { searchTerm, searchFields, limit = 50 } = body;
 
     if (!searchTerm) {
       return NextResponse.json({ error: 'Search term is required' }, { status: 400 });
@@ -62,6 +73,11 @@ export async function POST(request: NextRequest) {
     const searchedQueries: string[] = [];
     const processedDocIds = new Set<string>();
 
+    // Create timeout promise for query protection
+    const queryTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout')), 25000); // 25 second query timeout
+    });
+
     // Search exact matches for each field in mzs collection only
     for (const field of fieldsToSearch) {
       try {
@@ -70,7 +86,12 @@ export async function POST(request: NextRequest) {
           .where(field, '==', searchTerm)
           .limit(limit);
         
-        const snapshot = await query.get();
+        // Add timeout protection to query
+        const snapshot = await Promise.race([
+          query.get(),
+          queryTimeout
+        ]) as FirebaseFirestore.QuerySnapshot;
+        
         searchedQueries.push(`mzs.${field} == "${searchTerm}"`);
 
         snapshot.docs.forEach(doc => {
@@ -116,7 +137,12 @@ export async function POST(request: NextRequest) {
               .where(field, '<', endValue)
               .limit(limit - results.length);
             
-            const snapshot = await query.get();
+            // Add timeout protection to query
+            const snapshot = await Promise.race([
+              query.get(),
+              queryTimeout
+            ]) as FirebaseFirestore.QuerySnapshot;
+            
             searchedQueries.push(`mzs.${field} prefix "${searchTerm}"`);
             
             snapshot.docs.forEach(doc => {

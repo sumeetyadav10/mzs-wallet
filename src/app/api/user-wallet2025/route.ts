@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         sessionResult = await SecureSessionManager.createSecureSession({
           web3AuthIdToken: web3AuthToken,
           verifiedUserData: {
-            uid: email, // Use email as uid for MZS wallet users
+            userId: email, // Use email as userId for MZS wallet users
             email: email,
             name: tokenPayload.name || email
           },
