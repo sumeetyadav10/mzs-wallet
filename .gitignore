@@ -78,15 +78,34 @@ firebase-debug.log
 
 # Data and script files
 *.csv
+*.xlsx
+*.xls
 *.json
 *.sh
 *.tc
 *.txt
 
 # Security-sensitive scripts
+check_*.js
 check-*.js
+analyze_*.js
 analyze-*.js
+add_*.js
 add-*.js
+find_*.js
+fix_*.js
+list_*.js
+restore_*.js
+compile_*.js
+debug_*.js
+match_*.js
+migrate_*.js
+query_*.js
+show_*.js
+simple_*.js
+undo_*.js
+verify_*.js
+comprehensive_*.js
 *firestore*.js
 *wallet-check*.js
 
