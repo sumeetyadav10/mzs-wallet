@@ -171,140 +171,12 @@ export default function Dashboard() {
     loadWallet();
   }, []);
 
-  useEffect(() => {
-    setLoading(true); // Reset loading state when wallet/address/balance changes
-    const fetchTokenBalances = async () => {
-      if (!wallet || !address) return;
-      try {
-        if (selectedChain === 'polygon') {
-          const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
-          // MATIC
-          setMaticBalance(balance);
-          // MZS
-          const mzsContract = new ethers.Contract(MZS_ADDRESS, MZS_ABI, provider);
-          const [mzsRaw, decimals, symbol] = await Promise.all([
-            mzsContract.balanceOf(address),
-            mzsContract.decimals(),
-            mzsContract.symbol()
-          ]);
-          setMzsBalance(ethers.formatUnits(mzsRaw, decimals));
-          // Custom tokens
-          const savedTokens = localStorage.getItem(`customTokens_${address}`);
-          const customTokens: string[] = savedTokens ? JSON.parse(savedTokens) : [];
-          const customTokenBalances: TokenBalance[] = [];
-          const batchSize = 5;
-          for (let i = 0; i < customTokens.length; i += batchSize) {
-            const batch = customTokens.slice(i, i + batchSize);
-            await Promise.all(batch.map(async (tokenAddress) => {
-              try {
-                const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
-                const [balance, decimals, symbol] = await Promise.all([
-                  contract.balanceOf(address),
-                  contract.decimals(),
-                  contract.symbol()
-                ]);
-                customTokenBalances.push({
-                  symbol,
-                  balance: ethers.formatUnits(balance, decimals),
-                  address: tokenAddress,
-                  icon: tokenIcons[symbol] || ''
-                });
-              } catch (error) {
-                console.error(`Error fetching balance for token ${tokenAddress}:`, error);
-              }
-            }));
-            if (i + batchSize < customTokens.length) {
-              await new Promise(res => setTimeout(res, 1000)); // Wait 1 second between batches
-            }
-          }
+  // REMOVED: Automatic balance fetching on mount/state changes
+  // Balances are now only fetched when user clicks the manual refresh button
+  // This prevents rate limiting and gives user full control
 
-          // Combine all token balances
-          const allTokens: TokenBalance[] = [
-            {
-              symbol: 'MATIC',
-              balance: balance,
-              address: 'MATIC',
-              icon: tokenIcons['MATIC']
-            },
-            {
-              symbol: 'MZS',
-              balance: ethers.formatUnits(mzsRaw, decimals),
-              address: MZS_ADDRESS,
-              icon: tokenIcons['MZS']
-            },
-            ...customTokenBalances
-          ];
-
-          setTokenBalances(allTokens);
-          setTokenError(null);
-        } else if (selectedChain === 'tron' && tronBalance) {
-          // Update token balances for Tron
-          const allTronTokens: TokenBalance[] = [
-            {
-              symbol: 'TRX',
-              balance: tronBalance.trxBalance.toString(),
-              address: 'native',
-              icon: '/tron-logo.svg'
-            },
-            ...tronBalance.tokens.map(token => ({
-              symbol: token.symbol,
-              balance: token.balance.toString(),
-              address: token.address,
-              icon: token.logo || '/tron-logo.svg'
-            }))
-          ];
-          setTronTokens(allTronTokens);
-          setLoading(false);
-        }
-      } catch (error) {
-        setTokenError('토큰 잔액을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
-        setTokenBalances([]);
-        setMaticBalance(null);
-        setMzsBalance(null);
-        console.error('Error fetching token balances:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (wallet && address) {
-      fetchTokenBalances();
-      // Update balances every 30 seconds
-      const interval = setInterval(fetchTokenBalances, 120000); // Reduced frequency: every 2 minutes
-
-      // Listen for changes in localStorage
-      const handleStorageChange = (e: StorageEvent) => {
-        if (e.key === `customTokens_${address}`) {
-          fetchTokenBalances();
-        }
-      };
-
-      window.addEventListener('storage', handleStorageChange);
-
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('storage', handleStorageChange);
-      };
-    }
-  }, [wallet, address, balance, selectedChain, tronBalance]);
-
-  useEffect(() => {
-    // Check Polygon network connection
-    const checkPolygonNetwork = async () => {
-      try {
-        const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_POLYGON_RPC_URL);
-        const network = await provider.getNetwork();
-        if (network.chainId !== BigInt(137)) {
-          setNetworkWarning('Polygon 메인넷에 연결되지 않았습니다. RPC URL을 확인해주세요.');
-        } else {
-          setNetworkWarning(null);
-        }
-      } catch (error) {
-        setNetworkWarning('Polygon 네트워크에 연결할 수 없습니다. RPC URL을 확인해주세요.');
-      }
-    };
-    checkPolygonNetwork();
-  }, []);
+  // REMOVED: Automatic network check to avoid rate limiting
+  // Network status is checked only when user performs actions
 
   // 🔐 AUTO-RESTORE SESSION FROM WEB3AUTH (from landing page)
   useEffect(() => {
@@ -797,9 +669,70 @@ export default function Dashboard() {
 
   // Add a function to refresh token balances
   const handleRefresh = async () => {
+    if (!address) return;
+
     setRefreshing(true);
-    await new Promise(res => setTimeout(res, 300)); // Simulate loading
-    setRefreshing(false);
+
+    try {
+      if (selectedChain === 'polygon') {
+        // Get custom tokens from localStorage
+        const savedTokens = localStorage.getItem(`customTokens_${address}`);
+        const customTokens: string[] = savedTokens ? JSON.parse(savedTokens) : [];
+
+        // Fetch balances from server-side API
+        const response = await fetch('/api/polygon/balance', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            address,
+            customTokens
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[Dashboard] Refresh - Polygon balance API response:', data);
+
+          // Update MATIC balance
+          setMaticBalance(data.maticBalance.toString());
+          setBalance(data.maticBalance.toString());
+
+          // Find MZS token in the response
+          const mzsToken = data.tokens.find((t: any) => t.address.toLowerCase() === MZS_ADDRESS.toLowerCase());
+          if (mzsToken) {
+            setMzsBalance(mzsToken.balance.toString());
+          }
+
+          // Build token list
+          const allTokens: TokenBalance[] = [
+            {
+              symbol: 'MATIC',
+              balance: data.maticBalance.toString(),
+              address: 'MATIC',
+              icon: tokenIcons['MATIC']
+            },
+            ...data.tokens.map((token: any) => ({
+              symbol: token.symbol,
+              balance: token.balance.toString(),
+              address: token.address,
+              icon: tokenIcons[token.symbol] || ''
+            }))
+          ];
+
+          setTokenBalances(allTokens);
+        }
+      } else if (selectedChain === 'tron') {
+        // Refresh Tron balances
+        await getBalance();
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error refreshing balances:', error);
+      setTokenError('잔액을 새로고침하는 중 오류가 발생했습니다.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   if (loading) {
@@ -879,9 +812,32 @@ export default function Dashboard() {
           {/* Token List */}
           <div className="w-full max-w-[420px] mx-auto">
             <div className="glass p-3 rounded-2xl shadow mb-2">
-              <h3 className="text-lg font-bold text-[var(--golf-green)] mb-2 text-left">
-                {selectedChain === 'polygon' ? 'Polygon' : 'Tron'} 토큰
-              </h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-[var(--golf-green)] text-left">
+                  {selectedChain === 'polygon' ? 'Polygon' : 'Tron'} 토큰
+                </h3>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="btn glass text-sm px-3 py-1 flex items-center gap-1"
+                  aria-label="잔액 불러오기"
+                  title="클릭하여 토큰 잔액을 불러오세요"
+                >
+                  {refreshing ? (
+                    <span className="animate-spin h-4 w-4 border-2 border-t-2 border-[var(--golf-green)] border-t-transparent rounded-full"></span>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.635 19A9 9 0 003 12c0-5 4-9 9-9s9 4 9 9a9 9 0 01-1.356 4.707" />
+                    </svg>
+                  )}
+                  {refreshing ? '불러오는 중...' : '잔액 불러오기'}
+                </button>
+              </div>
+              {tokenError && (
+                <div className="bg-red-500/20 border border-red-500 text-white p-3 rounded-lg mb-3 text-sm">
+                  {tokenError}
+                </div>
+              )}
               {(selectedChain === 'polygon' ? tokenBalances : tronTokens).length > 0 ? (
                 <ul className="flex flex-col gap-2">
                   {(selectedChain === 'polygon' ? tokenBalances : tronTokens).map((token, idx) => (
@@ -895,7 +851,9 @@ export default function Dashboard() {
                   ))}
                 </ul>
               ) : (
-                <div className="text-[var(--golf-gold)] text-center py-2">아직 토큰이 없습니다. 첫 번째 클럽을 추가해보세요!</div>
+                <div className="text-[var(--golf-gold)] text-center py-2">
+                  위의 "잔액 불러오기" 버튼을 클릭하여 토큰을 확인하세요
+                </div>
               )}
             </div>
           </div>

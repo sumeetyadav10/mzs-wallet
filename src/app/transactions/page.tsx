@@ -22,7 +22,7 @@ export default function Transactions() {
   const router = useRouter();
   const pathname = usePathname();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,71 +30,71 @@ export default function Transactions() {
       router.push("/login");
       return;
     }
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      // Only fetch transactions for Polygon chain
-      if (selectedChain !== 'polygon') {
-        console.log('Transactions only available for Polygon chain. Current chain:', selectedChain);
-        setTransactions([]);
-        setIsLoading(false);
-        return;
+  }, [wallet, address, router]);
+
+  // Manual fetch function
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    // Only fetch transactions for Polygon chain
+    if (selectedChain !== 'polygon') {
+      console.log('Transactions only available for Polygon chain. Current chain:', selectedChain);
+      setTransactions([]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Use correct API endpoint
+      const response = await fetch(`/api/polygon/transactions?address=${address}&limit=20`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      try {
-        // Use proxy API to avoid CORS issues in production
-        const [nativeTxs, tokenTxs] = await Promise.all([
-          fetch(`/api/transactions?address=${address}&action=txlist`).then(res => {
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            return res.json();
-          }),
-          fetch(`/api/transactions?address=${address}&action=tokentx`).then(res => {
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            return res.json();
-          })
-        ]);
-        console.log('Native transactions response:', nativeTxs);
-        console.log('Token transactions response:', tokenTxs);
-        console.log('Current address:', address);
-        console.log('Selected chain:', selectedChain);
-        
-        // Check if API returned an error
-        if (nativeTxs.status !== "1") {
-          console.error('Native TX API Error:', nativeTxs.message || nativeTxs.result);
-        }
-        if (tokenTxs.status !== "1") {
-          console.error('Token TX API Error:', tokenTxs.message || tokenTxs.result);
-        }
-        const nativeTransactions = nativeTxs.status === "1" && nativeTxs.result ? nativeTxs.result.map((tx: any) => ({
-          hash: tx.hash,
-          from: tx.from,
-          to: tx.to,
-          value: ethers.formatEther(tx.value),
-          timestamp: Number(tx.timeStamp),
-          status: tx.isError === "1" ? 'failed' : 'success',
-          tokenSymbol: 'MATIC',
-        })) : [];
-        const tokenTransactions = tokenTxs.status === "1" && tokenTxs.result ? tokenTxs.result.map((tx: any) => ({
-          hash: tx.hash,
-          from: tx.from,
-          to: tx.to,
-          value: ethers.formatUnits(tx.value, Number(tx.tokenDecimal)),
-          timestamp: Number(tx.timeStamp),
-          status: tx.isError === "1" ? 'failed' : 'success',
-          tokenSymbol: tx.tokenSymbol,
-        })) : [];
-        const allTxs = [...nativeTransactions, ...tokenTransactions].sort((a, b) => b.timestamp - a.timestamp);
-        setTransactions(allTxs);
-      } catch (err) {
-        console.error('Error fetching transactions:', err);
-        setError("\uac70\ub798 \ub0b4\uc5ed\uc744 \ubd88\ub7ec\uc624\ub294\ub370 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4");
-      } finally {
-        setIsLoading(false);
+
+      const data = await response.json();
+      console.log('Polygon transactions response:', data);
+
+      const { nativeTxs, tokenTxs } = data;
+
+      // Check if API returned an error
+      if (nativeTxs.status !== "1") {
+        console.error('Native TX API Error:', nativeTxs.message || nativeTxs.result);
       }
-    };
-    fetchTransactions();
-  }, [wallet, address, router, selectedChain]);
+      if (tokenTxs.status !== "1") {
+        console.error('Token TX API Error:', tokenTxs.message || tokenTxs.result);
+      }
+
+      const nativeTransactions = nativeTxs.status === "1" && nativeTxs.result ? nativeTxs.result.map((tx: any) => ({
+        hash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        value: ethers.formatEther(tx.value),
+        timestamp: Number(tx.timeStamp),
+        status: tx.isError === "1" ? 'failed' : 'success',
+        tokenSymbol: 'MATIC',
+      })) : [];
+
+      const tokenTransactions = tokenTxs.status === "1" && tokenTxs.result ? tokenTxs.result.map((tx: any) => ({
+        hash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        value: ethers.formatUnits(tx.value, Number(tx.tokenDecimal)),
+        timestamp: Number(tx.timeStamp),
+        status: tx.isError === "1" ? 'failed' : 'success',
+        tokenSymbol: tx.tokenSymbol,
+      })) : [];
+
+      const allTxs = [...nativeTransactions, ...tokenTransactions].sort((a, b) => b.timestamp - a.timestamp);
+      setTransactions(allTxs);
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+      setError("거래 내역을 불러오는데 실패했습니다");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: '80vh', background: 'var(--golf-gradient)', borderRadius: '18px', boxShadow: 'var(--golf-shadow)', padding: '2em 0' }}>
@@ -103,16 +103,44 @@ export default function Transactions() {
           <FaFlagCheckered size={36} color="var(--golf-gold)" />
           <h2 style={{ color: 'var(--golf-green)', fontWeight: 700, fontSize: '2rem', margin: 0 }}>골프 스코어카드</h2>
         </div>
+
+        {/* Manual Load Button */}
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={fetchTransactions}
+            disabled={isLoading || selectedChain !== 'polygon'}
+            className="btn glass"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              opacity: selectedChain !== 'polygon' ? 0.5 : 1
+            }}
+          >
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-t-2 border-[var(--golf-green)] border-t-transparent"></div>
+                불러오는 중...
+              </>
+            ) : (
+              <>
+                <FaGolfBall size={16} />
+                거래 내역 불러오기
+              </>
+            )}
+          </button>
+        </div>
+
         <div style={{ marginTop: 16 }}>
           <h3 style={{ color: 'var(--golf-green)', fontWeight: 600, marginBottom: 12 }}>최근 거래</h3>
-          {isLoading ? (
-            <div style={{ padding: '2em 0' }}><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--golf-accent)]"></div></div>
-          ) : error ? (
+          {error ? (
             <div style={{ color: 'var(--golf-gold)', fontWeight: 600 }}>{error}</div>
           ) : selectedChain === 'tron' ? (
             <div style={{ color: 'var(--golf-gold)', fontWeight: 500 }}>트론 체인의 거래 내역은 아직 지원되지 않습니다.</div>
           ) : transactions.length === 0 ? (
-            <div style={{ color: 'var(--golf-gold)', fontWeight: 500 }}>아직 거래가 없습니다.</div>
+            <div style={{ color: 'var(--golf-gold)', fontWeight: 500 }}>
+              위의 "거래 내역 불러오기" 버튼을 클릭하여 거래 내역을 확인하세요
+            </div>
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {transactions.map((tx) => (

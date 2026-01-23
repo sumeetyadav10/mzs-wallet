@@ -80,12 +80,22 @@ firebase-debug.log
 *.csv
 *.xlsx
 *.xls
-*.json
+*.md
 *.sh
 *.tc
 *.txt
 
-# Security-sensitive scripts
+# Reports and analysis files
+*report*.json
+*analysis*.json
+*summary*.json
+*summary*.txt
+*summary*.md
+*_complete.*
+*_final.*
+*_comprehensive.*
+
+# Security-sensitive scripts and utilities
 check_*.js
 check-*.js
 analyze_*.js
@@ -109,8 +119,38 @@ comprehensive_*.js
 *firestore*.js
 *wallet-check*.js
 
-# Exclude specific config files that should be committed
+# Temporary and backup files
+*.bak
+*.backup
+*~
+.swp
+.swo
+
+# Logs and debugging
+logs/
+*.log.gz
+debug.log
+
+# OS and system files
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.vscode/launch.json
+
+# Python-related (if used)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+
+# Excluded from .gitignore but keep essential files
 !package.json
 !package-lock.json
 !tsconfig.json
 !next.config.js
+!firestore.rules
+!firestore.indexes.json
+!firebase.json
+!.gitignore
+!README.md
+!LICENSE
