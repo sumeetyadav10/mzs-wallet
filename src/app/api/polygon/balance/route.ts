@@ -189,7 +189,7 @@ function isRateLimited(clientId: string): boolean {
 // GET endpoint for convenience
 export async function GET(req: NextRequest) {
   // Rate limiting
-  const clientIp = req.ip || 'unknown';
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'unknown';
   if (isRateLimited(clientIp)) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 });
   }
