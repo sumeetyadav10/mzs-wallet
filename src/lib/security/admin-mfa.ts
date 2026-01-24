@@ -80,14 +80,40 @@ export class AdminMFA {
       logger.log('✅ MFA challenge generated and verified in DB', {
         challengeId,
         adminId: params.adminId,
+        email: params.email,
         type: params.type,
         savedInDB: verifyDoc.exists,
-        docData: verifyDoc.exists ? { ...verifyDoc.data(), code: '***' } : null
+        codeLength: code.length,
+        saltLength: salt.length,
+        expiresAt: expiresAt.toISOString(),
+        expiresInMs: this.CODE_EXPIRY,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent?.substring(0, 100) + '...',
+        docData: verifyDoc.exists ? { 
+          adminId: verifyDoc.data()?.adminId,
+          email: verifyDoc.data()?.email,
+          type: verifyDoc.data()?.type,
+          attempts: verifyDoc.data()?.attempts,
+          verified: verifyDoc.data()?.verified,
+          codeFormatValid: verifyDoc.data()?.code?.includes(':')
+        } : null
       });
 
       // For email/SMS, we would send the code
       if (params.type === 'email') {
+        logger.log('📧 Sending MFA email', {
+          challengeId,
+          adminId: params.adminId,
+          email: params.email,
+          codeLength: code.length,
+          emailSendTime: new Date().toISOString()
+        });
         await this.sendEmailMFA(params.email, code);
+        logger.log('📧 MFA email sent successfully', {
+          challengeId,
+          adminId: params.adminId,
+          email: params.email
+        });
         return { challengeId }; // Don't return code for email/SMS
       } else if (params.type === 'sms') {
         // await this.sendSMSMFA(phoneNumber, code);
@@ -112,85 +138,248 @@ export class AdminMFA {
     error?: string;
   }> {
     try {
-      logger.log('🔍 Verifying MFA challenge', { challengeId, providedCode: '***' });
+      // 🔍 ENHANCED LOGGING: Sanitize and normalize input
+      const sanitizedCode = providedCode?.toString().trim().replace(/\D/g, '') || '';
+      const originalCodeLength = providedCode?.length || 0;
+      const sanitizedCodeLength = sanitizedCode.length;
+      
+      logger.log('🔍 MFA Verification Debug - Input Analysis', {
+        challengeId,
+        originalCodeLength,
+        sanitizedCodeLength,
+        hasNonDigits: originalCodeLength !== sanitizedCodeLength,
+        codeStart: sanitizedCode.substring(0, 2) + '****',
+        timestamp: new Date().toISOString()
+      });
       
       const challengeDoc = await db.collection('admin_mfa_challenges').doc(challengeId).get();
 
       if (!challengeDoc.exists) {
-        logger.error('❌ Challenge document not found', { challengeId });
+        logger.error('❌ Challenge document not found', { 
+          challengeId,
+          lookupTime: new Date().toISOString()
+        });
         
         // Debug: Check if there are any challenges in the collection
         const allChallenges = await db.collection('admin_mfa_challenges').get();
         logger.log('📊 Available challenges in DB:', { 
           count: allChallenges.size,
-          challengeIds: allChallenges.docs.map(doc => doc.id)
+          challengeIds: allChallenges.docs.map(doc => doc.id),
+          searchedId: challengeId
         });
         
         return { success: false, error: 'Invalid challenge ID' };
       }
 
       const challenge = challengeDoc.data() as MFAChallenge;
+      const now = new Date();
+
+      // 🔍 ENHANCED LOGGING: Challenge state analysis
+      logger.log('🔍 MFA Verification Debug - Challenge State', {
+        challengeId,
+        adminId: challenge.adminId,
+        email: challenge.email,
+        attempts: challenge.attempts,
+        maxAttempts: this.MAX_ATTEMPTS,
+        verified: challenge.verified,
+        challengeType: challenge.type,
+        createdTime: (() => {
+          try {
+            if (challenge.expiresAt) {
+              const expiry = challenge.expiresAt instanceof Date ? challenge.expiresAt : new Date(challenge.expiresAt);
+              const created = new Date(expiry.getTime() - this.CODE_EXPIRY);
+              return created.toISOString();
+            }
+            return 'unknown';
+          } catch {
+            return 'invalid_date';
+          }
+        })(),
+        currentTime: now.toISOString()
+      });
 
       // Check if challenge is expired (handle Firestore timestamp)
       const expirationTime = challenge.expiresAt instanceof Date ? challenge.expiresAt : new Date(challenge.expiresAt);
-      if (new Date() > expirationTime) {
+      const timeRemaining = expirationTime.getTime() - now.getTime();
+      
+      logger.log('🔍 MFA Verification Debug - Expiry Check', {
+        challengeId,
+        expirationTime: (() => {
+          try {
+            return expirationTime.toISOString();
+          } catch {
+            return 'invalid_expiry_date';
+          }
+        })(),
+        currentTime: now.toISOString(),
+        timeRemainingMs: timeRemaining,
+        timeRemainingMin: Math.round(timeRemaining / 60000 * 10) / 10,
+        isExpired: now > expirationTime
+      });
+      
+      if (now > expirationTime) {
         await challengeDoc.ref.delete();
+        logger.warn('❌ Challenge expired and deleted', {
+          challengeId,
+          adminId: challenge.adminId,
+          expiredBy: now.getTime() - expirationTime.getTime()
+        });
         return { success: false, error: 'Challenge expired' };
       }
 
       // Check if challenge is already verified
       if (challenge.verified) {
+        logger.warn('❌ Challenge already verified', {
+          challengeId,
+          adminId: challenge.adminId
+        });
         return { success: false, error: 'Challenge already used' };
       }
 
       // Check attempt limit
       if (challenge.attempts >= this.MAX_ATTEMPTS) {
         await challengeDoc.ref.delete();
+        logger.warn('❌ Too many attempts, challenge deleted', {
+          challengeId,
+          adminId: challenge.adminId,
+          attempts: challenge.attempts
+        });
         return { success: false, error: 'Too many attempts' };
       }
 
-      // Verify code
-      const [salt, storedHash] = challenge.code.split(':');
-      const providedHash = crypto.createHash('sha256').update(salt + providedCode).digest('hex');
+      // 🔍 ENHANCED LOGGING: Hash verification debug
+      try {
+        const codeParts = challenge.code?.split(':') || [];
+        
+        if (codeParts.length !== 2) {
+          logger.error('❌ Invalid challenge code format in database', {
+            challengeId,
+            adminId: challenge.adminId,
+            codePartsLength: codeParts.length,
+            codeFormat: challenge.code ? 'present' : 'missing'
+          });
+          return { success: false, error: 'Challenge data corrupted' };
+        }
 
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(storedHash, 'hex'),
-        Buffer.from(providedHash, 'hex')
-      );
-
-      // Update attempts
-      await challengeDoc.ref.update({
-        attempts: challenge.attempts + 1,
-        verified: isValid
-      });
-
-      if (isValid) {
-        logger.log('✅ MFA challenge verified successfully', {
-          challengeId,
-          adminId: challenge.adminId
-        });
-
-        // Mark as verified and cleanup after delay
-        setTimeout(async () => {
-          await challengeDoc.ref.delete();
-        }, 30000); // 30 seconds
-
-        return {
-          success: true,
-          adminId: challenge.adminId,
-          email: challenge.email
-        };
-      } else {
-        logger.warn('❌ MFA challenge verification failed', {
+        const [salt, storedHash] = codeParts;
+        
+        logger.log('🔍 MFA Verification Debug - Hash Components', {
           challengeId,
           adminId: challenge.adminId,
-          attempts: challenge.attempts + 1
+          saltLength: salt?.length || 0,
+          storedHashLength: storedHash?.length || 0,
+          saltStart: salt?.substring(0, 8) + '...',
+          storedHashStart: storedHash?.substring(0, 8) + '...'
         });
 
-        return { success: false, error: 'Invalid verification code' };
+        // Use sanitized code for hash generation
+        const providedHash = crypto.createHash('sha256').update(salt + sanitizedCode).digest('hex');
+        
+        logger.log('🔍 MFA Verification Debug - Hash Comparison', {
+          challengeId,
+          adminId: challenge.adminId,
+          providedCodeUsed: sanitizedCode,
+          providedHashStart: providedHash.substring(0, 8) + '...',
+          storedHashStart: storedHash.substring(0, 8) + '...',
+          hashesMatch: providedHash === storedHash,
+          saltConcatInput: `${salt}${sanitizedCode}`,
+          saltConcatLength: (salt + sanitizedCode).length
+        });
+
+        // Use timing-safe comparison with proper error handling
+        let isValid = false;
+        try {
+          const storedBuffer = Buffer.from(storedHash, 'hex');
+          const providedBuffer = Buffer.from(providedHash, 'hex');
+          isValid = crypto.timingSafeEqual(storedBuffer, providedBuffer);
+        } catch (bufferError) {
+          logger.error('❌ Buffer comparison failed', {
+            challengeId,
+            adminId: challenge.adminId,
+            error: bufferError instanceof Error ? bufferError.message : 'Unknown buffer error',
+            storedHashValid: /^[a-f0-9]+$/i.test(storedHash),
+            providedHashValid: /^[a-f0-9]+$/i.test(providedHash)
+          });
+          return { success: false, error: 'Hash comparison failed' };
+        }
+
+        // 🔒 ATOMIC UPDATE: Use transaction to prevent race conditions
+        await db.runTransaction(async (transaction) => {
+          const freshDoc = await transaction.get(challengeDoc.ref);
+          if (!freshDoc.exists) {
+            throw new Error('Challenge document deleted during verification');
+          }
+          
+          const freshData = freshDoc.data() as MFAChallenge;
+          
+          // Double-check attempt limit in transaction
+          if (freshData.attempts >= this.MAX_ATTEMPTS) {
+            throw new Error('Too many attempts reached during verification');
+          }
+          
+          // Update with atomic increment
+          transaction.update(challengeDoc.ref, {
+            attempts: freshData.attempts + 1,
+            verified: isValid,
+            lastAttemptAt: new Date()
+          });
+        });
+
+        if (isValid) {
+          logger.log('✅ MFA challenge verified successfully', {
+            challengeId,
+            adminId: challenge.adminId,
+            email: challenge.email,
+            finalAttempts: challenge.attempts + 1,
+            verificationTime: new Date().toISOString()
+          });
+
+          // Mark as verified and cleanup after delay
+          setTimeout(async () => {
+            try {
+              await challengeDoc.ref.delete();
+              logger.log('🧹 Challenge cleaned up after successful verification', { challengeId });
+            } catch (cleanupError) {
+              logger.warn('Failed to cleanup challenge', { challengeId, error: cleanupError });
+            }
+          }, 30000); // 30 seconds
+
+          return {
+            success: true,
+            adminId: challenge.adminId,
+            email: challenge.email
+          };
+        } else {
+          logger.warn('❌ MFA challenge verification failed - Hash mismatch', {
+            challengeId,
+            adminId: challenge.adminId,
+            email: challenge.email,
+            attempts: challenge.attempts + 1,
+            maxAttempts: this.MAX_ATTEMPTS,
+            providedCodeLength: sanitizedCode.length,
+            expectedCodeLength: 6
+          });
+
+          return { success: false, error: 'Invalid verification code' };
+        }
+        
+      } catch (hashError) {
+        logger.error('❌ Hash processing error', {
+          challengeId,
+          adminId: challenge.adminId,
+          error: hashError instanceof Error ? hashError.message : 'Unknown hash error',
+          challengeCodePresent: !!challenge.code
+        });
+        return { success: false, error: 'Verification processing failed' };
       }
+      
     } catch (error) {
-      logger.error('MFA verification failed:', error);
+      logger.error('❌ MFA verification system error', {
+        challengeId,
+        error: error instanceof Error ? error.message : 'Unknown system error',
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString()
+      });
       return { success: false, error: 'Verification failed' };
     }
   }

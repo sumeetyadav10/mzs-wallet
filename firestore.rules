@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(email) {
+      return isAuthenticated() && request.auth.token.email == email;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.admin == true;
+    }
+    
+    match /users/{docId} {
+      allow read: if isAuthenticated() && 
+        resource.data.auth_email == request.auth.token.email;
+      allow create: if isAuthenticated() &&
+        request.resource.data.auth_email == request.auth.token.email;
+      allow update: if isAuthenticated() &&
+        resource.data.auth_email == request.auth.token.email &&
+        request.resource.data.auth_email == request.auth.token.email;
+      allow delete: if false;
+    }
+
+    match /mzs/{docId} {
+      // FIXED: Allow authenticated users to read documents
+      // This allows both get() and where() queries
+      allow read: if isAuthenticated();
+      
+      // Alternative if you want to restrict to only the user's own documents:
+      // allow read: if isAuthenticated() && (
+      //   resource.data.auth_email == request.auth.token.email ||
+      //   // Allow querying - Firestore will filter results
+      //   request.auth != null
+      // );
+      
+      allow create: if isAuthenticated() &&
+        request.resource.data.auth_email == request.auth.token.email;
+      allow update: if isAuthenticated() &&
+        resource.data.auth_email == request.auth.token.email;
+      allow delete: if isAdmin();
+    }
+    
+    match /gcv/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.auth_email == request.auth.token.email;
+      allow update: if isAuthenticated() &&
+        resource.data.auth_email == request.auth.token.email;
+      allow delete: if isAdmin();
+    }
+
+    match /gng/{docId} {
+      allow read: if true;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.auth_email == request.auth.token.email &&
+        request.resource.data.keys().hasAll(['auth_email', 'user_id']);
+
+      allow update: if isAuthenticated() &&
+        resource.data.auth_email == request.auth.token.email &&
+        request.resource.data.auth_email == resource.data.auth_email;
+
+      allow delete: if false;
+    }
+
+    match /gcv_password_reset_requests/{docId} {
+      allow read: if isAuthenticated() &&
+        resource.data.email == request.auth.token.email;
+      allow create: if
+        request.resource.data.keys().hasAll(['email', 'reset_token', 'created_at']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /mzs_password_reset_requests/{docId} {
+      allow read: if isAuthenticated() &&
+        resource.data.email == request.auth.token.email;
+      allow create: if
+        request.resource.data.keys().hasAll(['email', 'reset_token', 'created_at']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /gng-password_reset_requests/{docId} {
+      allow read: if isAuthenticated() &&
+        resource.data.email == request.auth.token.email;
+      allow create: if
+        request.resource.data.keys().hasAll(['email', 'reset_token', 'created_at']);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /admin_logs/{docId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
