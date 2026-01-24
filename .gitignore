@@ -154,3 +154,4 @@ __pycache__/
 !.gitignore
 !README.md
 !LICENSE
+search_user_security_logs.js
