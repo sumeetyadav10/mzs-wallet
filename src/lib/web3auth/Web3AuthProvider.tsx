@@ -198,11 +198,17 @@ export const Web3AuthProvider = ({ children }: { children: React.ReactNode }) =>
     }
 
     try {
-      await web3auth.logout();
+      // Only logout if actually connected
+      if (web3auth.connected) {
+        await web3auth.logout();
+      }
       setProvider(null);
       setIsConnected(false);
     } catch (error) {
       console.error("Error disconnecting from Web3Auth:", error);
+      // Clear state even if logout fails
+      setProvider(null);
+      setIsConnected(false);
       throw error;
     }
   };

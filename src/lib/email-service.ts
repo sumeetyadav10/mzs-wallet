@@ -26,7 +26,8 @@ export class EmailService {
   static async sendOTPEmail(data: OTPEmailData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
       const { email, otp, amount, currency, toAddress } = data;
-      
+
+      console.log('[Email Service] Sending OTP to:', email);
       const result = await resend.emails.send({
         from: 'MZS Wallet <noreply@mzswallet.com>',
         to: [email],
@@ -82,24 +83,27 @@ export class EmailService {
 
       if (result.error) {
         // Email sending failed
+        console.error('[Email Service] Resend error:', result.error);
         return { success: false, error: result.error.message };
       }
 
+      console.log('[Email Service] Email sent successfully to:', email, 'MessageId:', result.data?.id);
       return { success: true, messageId: result.data?.id };
     } catch (error: any) {
       // Detailed error logging for troubleshooting
+      console.error('[Email Service] Exception:', error);
       if (error.name === 'application_error') {
         // Email sending failed - detailed error
-        
+
         // Check for network/DNS issues
         if (error.message?.includes('fetch failed') || error.message?.includes('Unable to fetch data')) {
-          return { 
-            success: false, 
-            error: 'Email service temporarily unavailable. Please try again in a few moments.' 
+          return {
+            success: false,
+            error: 'Email service temporarily unavailable. Please try again in a few moments.'
           };
         }
       }
-      
+
       // Email service error
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }

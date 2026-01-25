@@ -50,8 +50,9 @@ export class SecureSessionManager extends SessionManager {
       throw new Error('Invalid userId or email for session creation');
     }
     
+    const sessionDurationHours = parseInt(process.env.ADMIN_SESSION_DURATION_HOURS || '24', 10);
     const token = jwt.sign(sessionData, jwtSecret, {
-      expiresIn: '24h',
+      expiresIn: `${sessionDurationHours}h`,
       issuer: 'mzs-wallet',
       audience: 'mzs-wallet-users',
       subject: subjectId
@@ -83,29 +84,34 @@ export class SecureSessionManager extends SessionManager {
       if (!jwtSecret) {
         throw new Error('JWT_SECRET environment variable is required for session verification');
       }
-      
+
       const decoded = jwt.verify(token, jwtSecret) as any;
-      
+
       // Validate token claims
       if (!decoded.userId || !decoded.email) {
         logger.warn('Invalid secure session token structure');
         return null;
       }
-      
+
       // Check if token is expired
       if (decoded.exp && Date.now() >= decoded.exp * 1000) {
-        logger.warn('Secure session token expired');
+        logger.debug('Secure session token expired');
         return null;
       }
-      
+
       logger.log('✅ Secure session verified successfully', {
         userId: decoded.userId,
         email: decoded.email,
         authMethod: decoded.authMethod
       });
-      
+
       return decoded;
-    } catch (error) {
+    } catch (error: any) {
+      // Handle token expiration silently - it's expected
+      if (error.name === 'TokenExpiredError') {
+        logger.debug('Session token expired - user needs to login again');
+        return null;
+      }
       logger.warn('Secure session verification failed:', error);
       return null;
     }

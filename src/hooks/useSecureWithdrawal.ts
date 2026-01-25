@@ -34,25 +34,25 @@ export const useSecureWithdrawal = () => {
   const generateOTP = async (request: WithdrawalRequest): Promise<OTPData | null> => {
     try {
       setError(null);
-      
+
       // DEBUG: Check all possible token locations
       const sessionToken = sessionStorage.getItem('accessToken');
       const secureSessionToken = sessionStorage.getItem('secure_session_token');
       const localToken = localStorage.getItem('secure_session_token');
       const authMethod = sessionStorage.getItem('authMethod');
-      
+
       // Token verification (reduced logging for performance)
       if (!secureSessionToken && !sessionToken && !localToken) {
         console.warn('⚠️ No authentication tokens found');
       }
-      
+
       // Token check - prioritize secure session tokens
       const authToken = secureSessionToken || sessionToken || localToken;
       if (!authToken) {
         // Check if user has wallet data but missing session token
         const hasWallet = !!sessionStorage.getItem('walletPrivateKey');
         const hasUserInfo = !!localStorage.getItem('userInfo');
-        
+
         if (hasWallet && hasUserInfo) {
           throw new Error('Session expired - please refresh the page or log in again');
         } else {
@@ -77,6 +77,16 @@ export const useSecureWithdrawal = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle session expiration specifically
+        if (data.requiresRelogin) {
+          const errorMsg = 'Your session has expired. Please log in again to continue.';
+          setError(errorMsg);
+          // Clear session storage on expiration
+          sessionStorage.removeItem('secure_session_token');
+          sessionStorage.removeItem('accessToken');
+          localStorage.removeItem('secure_session_token');
+          throw new Error(errorMsg);
+        }
         throw new Error(data.error || 'Failed to generate OTP');
       }
 
@@ -90,7 +100,8 @@ export const useSecureWithdrawal = () => {
         requiresOTP: true
       };
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate OTP');
+      const errorMsg = err instanceof Error ? err.message : 'Failed to generate OTP';
+      setError(errorMsg);
       return null;
     }
   };
@@ -137,6 +148,17 @@ export const useSecureWithdrawal = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle session expiration
+        if (data.requiresRelogin) {
+          const errorMsg = 'Your session has expired. Please log in again to continue.';
+          setError(errorMsg);
+          // Clear session storage on expiration
+          sessionStorage.removeItem('secure_session_token');
+          sessionStorage.removeItem('accessToken');
+          localStorage.removeItem('secure_session_token');
+          throw new Error(errorMsg);
+        }
+
         // If OTP is required, show the OTP modal
         if (data.requiresOTP) {
           setPendingWithdrawal(request);
@@ -149,7 +171,7 @@ export const useSecureWithdrawal = () => {
             }
           }
         }
-        
+
         throw new Error(data.error || data.message || 'Transaction failed');
       }
 
