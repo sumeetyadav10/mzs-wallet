@@ -47,7 +47,7 @@ export const Web3AuthCapacitorProvider = ({ children }: { children: React.ReactN
             chainConfig: {
               chainNamespace: CHAIN_NAMESPACES.EIP155,
               chainId: "0x89", // Polygon mainnet
-              rpcTarget: "https://polygon-rpc.com",
+              rpcTarget: process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon.drpc.org",
               displayName: "Polygon Mainnet",
               blockExplorerUrl: "https://polygonscan.com",
               ticker: "MATIC",
