@@ -1,5 +1,4 @@
 import { Web3Auth } from "@web3auth/modal";
-import { OpenloginAdapter } from "@web3auth/openlogin-adapter";
 import { createContext, useContext, useEffect, useState } from "react";
 import { CHAIN_NAMESPACES, IProvider } from "@web3auth/base";
 import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
@@ -67,17 +66,6 @@ export const Web3AuthProvider = ({ children }: { children: React.ReactNode }) =>
           storageKey: "local",
         });
 
-        const openloginAdapter = new OpenloginAdapter({
-          adapterSettings: {
-            clientId,
-            network: "sapphire_mainnet",
-            uxMode: "popup",
-            // whiteLabel removed - requires paid Web3Auth plan
-          },
-        });
-
-        web3authInstance.configureAdapter(openloginAdapter);
-        
         console.log("🔄 Initializing Web3Auth modal...");
         await web3authInstance.initModal();
         console.log("✅ Web3Auth initialized successfully");
